@@ -66,18 +66,42 @@ class DefaultProcessor extends AbstractProcessor {
         return $processor->process($tokens);
     }
 
+    public function splitQuery($tokens, $delimiter){
+        $i = 0;
+        $out = [0=>[]];
+        foreach ($tokens as $token){
+            if($token == $delimiter){
+                $i++;
+                $out[$i] = [];
+            }else{
+                $out[$i][] = $token;
+            }
+        }
+        return $out;
+    }
+
     public function process($sql) {
 
-        $inputArray = $this->splitSQLIntoTokens($sql);
-        $queries = $this->processUnion($inputArray);
+        $delimiter = $this->options->getDelimiter();
 
-        // If there was no UNION or UNION ALL in the query, then the query is
-        // stored at $queries[0].
-        if (!empty($queries) && !$this->isUnion($queries)) {
-            $queries = $this->processSQL($queries[0]);
+        $inputArray = $this->splitSQLIntoTokens($sql);
+
+        $chuncks = $this->splitQuery($inputArray,$delimiter);
+        $out = [];
+        foreach ($chuncks as $i => $pack) {
+            //$queries = $this->processUnion($pack);
+
+            // If there was no UNION or UNION ALL in the query, then the query is
+            // stored at $queries[0].
+            //if (!empty($queries) && !$this->isUnion($queries)) {
+            $queries = $this->processSQL($pack);
+            //}
+            if($queries) {
+                $out[$i] = $queries;
+            }
         }
 
-        return $queries;
+        return $out;
     }
 
     public function revokeQuotation($sql) {

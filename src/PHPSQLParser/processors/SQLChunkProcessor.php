@@ -58,10 +58,26 @@ class SQLChunkProcessor extends AbstractProcessor {
         unset($out['TABLE']['like']);
     }
 
-    public function process($out) {
+
+
+    public function process($out, $blockmode=false) {
         if (!$out) {
             return false;
         }
+
+        if ($blockmode) {
+            foreach ($out as $i => &$item) {
+                $this->processItems($item);
+            }
+        } else {
+            $this->processItems($out);
+        }
+        return $out;
+    }
+
+    public function processItems(&$out)
+    {
+
         if (!empty($out['BRACKET'])) {
             // TODO: this field should be a global STATEMENT field within the output
             // we could add all other categories as sub_tree, it could also work with multipe UNIONs
@@ -191,7 +207,78 @@ class SQLChunkProcessor extends AbstractProcessor {
         	$processor = new WithProcessor($this->options);
         	$out['WITH'] = $processor->process($out['WITH']);
         }
-
+        if(!empty($out['FUNCTION'])){
+            $processor = new FunctionProcessor($this->options);
+            $out['FUNCTION'] = $processor->process($out['FUNCTION']);
+        }
+        if(!empty($out['RETURNS'])){
+            $processor = new ReturnsProcessor($this->options);
+            $out['RETURNS'] = $processor->process($out['RETURNS']);
+        }
+        if(!empty($out['EXEC'])){
+            $processor = new ExecProcessor($this->options);
+            $out['EXEC'] = $processor->process($out['EXEC']);
+        }
+        if(!empty($out['PROCEDURE'])){
+            $processor = new ProcedureProcessor($this->options);
+            $out['PROCEDURE'] = $processor->process($out['PROCEDURE']);
+        }
+        if(!empty($out['EXECUTE'])){
+            $processor = new ExecuteProcessor($this->options);
+            $out['EXECUTE'] = $processor->process($out['EXECUTE']);
+        }
+        if(!empty($out['DECLARE'])){
+            $processor = new DeclareProcessor($this->options);
+            $out['DECLARE'] = $processor->process($out['DECLARE']);
+        }
+        if(!empty($out['BEGIN'])){
+            $processor = new BeginProcessor($this->options);
+            $out['BEGIN'] = $processor->process($out['BEGIN']);
+        }
+        if(!empty($out['IF'])){
+            $processor = new IfProcessor($this->options);
+            $out['IF'] = $processor->process($out['IF']);
+        }
+        if(!empty($out['TRIGGER'])){
+            $processor = new TriggerProcessor($this->options);
+            $out['TRIGGER'] = $processor->process($out['TRIGGER']);
+        }
+        if(!empty($out['MERGE'])){
+            $processor = new MergeProcessor($this->options);
+            $out['MERGE'] = $processor->process($out['MERGE']);
+        }
+        if(!empty($out['WHEN'])){
+            $processor = new WhenProcessor($this->options);
+            $out['WHEN'] = $processor->process($out['WHEN']);
+        }
+        if(!empty($out['THEN'])){
+            $processor = new WhenProcessor($this->options);
+            $out['THEN'] = $processor->process($out['THEN']);
+        }
+        if(!empty($out['OPEN'])){
+            $processor = new OpenProcessor($this->options);
+            $out['OPEN'] = $processor->process($out['OPEN']);
+        }
+        if(!empty($out['CLOSE'])){
+            $processor = new OpenProcessor($this->options);
+            $out['CLOSE'] = $processor->process($out['CLOSE']);
+        }
+        if(!empty($out['DEALLOCATE'])){
+            $processor = new OpenProcessor($this->options);
+            $out['DEALLOCATE'] = $processor->process($out['DEALLOCATE']);
+        }
+        if(!empty($out['FETCH'])){
+            $processor = new FetchProcessor($this->options);
+            $out['FETCH'] = $processor->process($out['FETCH']);
+        }
+        if(!empty($out['ALTER'])){
+            $processor = new AlterProcessor($this->options);
+            $out['ALTER'] = $processor->process($out['ALTER']);
+        }
+        if(!empty($out['AFTER'])){
+            $processor = new AfterProcessor($this->options);
+            $out['AFTER'] = $processor->process($out['AFTER']);
+        }
         return $out;
     }
 }

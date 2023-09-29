@@ -89,7 +89,10 @@ class PHPSQLLexer {
         $tokens = $this->concatEscapeSequences($tokens);
         $tokens = $this->balanceBackticks($tokens);
         $tokens = $this->concatColReferences($tokens);
+
         $tokens = $this->balanceParenthesis($tokens);
+        $tokens = $this->balanceParenthesis($tokens,"[","]");
+
         $tokens = $this->concatUserDefinedVariables($tokens);
         $tokens = $this->concatScientificNotations($tokens);
         $tokens = $this->concatNegativeNumbers($tokens);
@@ -261,11 +264,6 @@ class PHPSQLLexer {
                     $inline = true;
                 }
 
-                if (($comment === false) && (substr($token, 0, 1) === "#") && empty($backTicks)) {
-                    $comment = $i;
-                    $inline = true;
-                }
-
                 if (($comment === false) && ($token === "/*")) {
                     $comment = $i;
                     $inline = false;
@@ -404,21 +402,21 @@ class PHPSQLLexer {
         return array_values($tokens);
     }
 
-    protected function balanceParenthesis($tokens) {
+    protected function balanceParenthesis($tokens, $start = "(", $end = ")") {
         $token_count = count($tokens);
         $i = 0;
         while ($i < $token_count) {
-            if ($tokens[$i] !== '(') {
+            if ($tokens[$i][mb_strlen($tokens[$i])-1] !== $start) {
                 $i++;
                 continue;
             }
             $count = 1;
             for ($n = $i + 1; $n < $token_count; $n++) {
                 $token = $tokens[$n];
-                if ($token === '(') {
+                if ($token[mb_strlen($token)-1] === $start) {
                     $count++;
                 }
-                if ($token === ')') {
+                if ($token[0] === $end) {
                     $count--;
                 }
                 $tokens[$i] .= $token;

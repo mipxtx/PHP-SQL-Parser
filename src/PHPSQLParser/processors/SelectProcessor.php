@@ -42,6 +42,7 @@ namespace PHPSQLParser\processors;
 class SelectProcessor extends SelectExpressionProcessor {
 
     public function process($tokens) {
+
         $expression = "";
         $expressionList = array();
         foreach ($tokens as $token) {

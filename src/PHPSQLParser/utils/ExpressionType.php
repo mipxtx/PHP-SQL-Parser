@@ -89,6 +89,8 @@ class ExpressionType {
     const DATABASE = 'database';
     const SCHEMA = 'schema';
 
+    const FUNCTON = 'function';
+
     const PROCEDURE = 'procedure';
     const ENGINE = 'engine';
     const USER = 'user';

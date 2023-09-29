@@ -46,13 +46,21 @@ class IntoProcessor extends AbstractProcessor {
      * at the moment
      */
     public function process($tokenList) {
+
+        $base = "";
         $unparsed = $tokenList['INTO'];
         foreach ($unparsed as $k => $token) {
             if ($this->isWhitespaceToken($token) || $this->isCommaToken($token)) {
                 unset($unparsed[$k]);
             }
+            $base .= $token;
         }
-        $tokenList['INTO'] = array_values($unparsed);
+
+        $unparsed = array_values($unparsed);
+
+        $tokenList['INTO'] = ['base_src' => $base, 'table' => $unparsed[1],'tokens' => $unparsed];
+
+
         return $tokenList;
     }
 }

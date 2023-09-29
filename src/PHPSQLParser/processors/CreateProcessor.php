@@ -112,6 +112,11 @@ class CreateProcessor extends AbstractProcessor {
                 $expr[] = array('expr_type' => ExpressionType::RESERVED, 'base_expr' => $trim);
                 break;
 
+            case 'FUNCTION' :
+                $result['expr_type'] = ExpressionType::FUNCTON;
+                $result['not-exists'] = false;
+                $expr[] = array('expr_type' => ExpressionType::RESERVED, 'base_expr' => $trim);
+                break;
             default:
                 break;
             }

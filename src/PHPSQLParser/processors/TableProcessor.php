@@ -88,6 +88,7 @@ class TableProcessor extends AbstractProcessor {
         $base_expr = '';
         $skip = 0;
 
+        $prevCategory = "";
         foreach ($tokens as $tokenKey => $token) {
             $trim = trim($token);
             $base_expr .= $token;
@@ -102,6 +103,9 @@ class TableProcessor extends AbstractProcessor {
             }
 
             if ($trim === '') {
+                if ($prevCategory == "TABLE_NAME") {
+                    $result['name'] .= $token;
+                }
                 continue;
             }
 
@@ -131,14 +135,6 @@ class TableProcessor extends AbstractProcessor {
                 if ($prevCategory === 'TABLE_NAME') {
                     $currCategory = $upper;
                     continue 2;
-                }
-                break;
-
-            case '=':
-            // the optional operator
-                if ($prevCategory === 'TABLE_OPTION') {
-                    $expr[] = $this->getOperatorType($trim);
-                    continue 2; // don't change the category
                 }
                 break;
 
@@ -270,6 +266,14 @@ class TableProcessor extends AbstractProcessor {
                 }
                 // else
                 break;
+            case '=':
+                // the optional operator
+                if ($prevCategory === 'TABLE_OPTION') {
+                    $expr[] = $this->getOperatorType($trim);
+                    continue 2; // don't change the category
+                }
+                $currCategory = $prevCategory;
+
 
             default:
                 switch ($currCategory) {
@@ -307,9 +311,13 @@ class TableProcessor extends AbstractProcessor {
                     continue 3;
 
                 case 'TABLE_NAME':
-                    $result['base_expr'] = $result['name'] = $trim;
+
+                    $result['name'] .= $trim;
+
+                    $result['base_expr'] = $result['name'];
                     $result['no_quotes'] = $this->revokeQuotation($trim);
-                    $this->clear($expr, $base_expr, $prevCategory);
+                    //$this->clear($expr, $base_expr, $prevCategory);
+
                     break;
 
                 case 'LIKE':
@@ -320,14 +328,23 @@ class TableProcessor extends AbstractProcessor {
 
                 case '':
                 // after table name
-                    if ($prevCategory === 'TABLE_NAME' && $upper[0] === '(' && substr($upper, -1) === ')') {
-                        $unparsed = $this->splitSQLIntoTokens($this->removeParenthesisFromStart($trim));
-                        $coldef = $this->processCreateDefinition($unparsed);
-                        $result['create-def'] = array('expr_type' => ExpressionType::BRACKET_EXPRESSION,
-                                                      'base_expr' => $base_expr, 'sub_tree' => $coldef['create-def']);
-                        $expr = array();
-                        $base_expr = '';
-                        $currCategory = 'CREATE_DEF';
+                    if ($prevCategory === 'TABLE_NAME') {
+
+                        if ($upper[0] === '(' && substr($upper, -1) === ')') {
+                            $unparsed = $this->splitSQLIntoTokens($this->removeParenthesisFromStart($trim));
+                            $coldef = $this->processCreateDefinition($unparsed);
+                            $result['create-def'] = array('expr_type' => ExpressionType::BRACKET_EXPRESSION,
+                                'base_expr' => $base_expr, 'sub_tree' => $coldef['create-def']);
+                            $expr = array();
+                            $base_expr = '';
+                            $currCategory = 'CREATE_DEF';
+                        }else{
+
+                            $currCategory = $prevCategory;
+                            $result['name'] .= $trim;
+                            $result['base_expr'] = $result['name'];
+                            $result['no_quotes'] = $this->revokeQuotation($trim);
+                        }
                     }
                     break;
 

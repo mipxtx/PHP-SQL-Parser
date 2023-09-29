@@ -29,6 +29,9 @@
 	"autoload" : {
 		"psr-0" : {
 			"PHPSQLParser\\" : "src/"
+		},
+		"psr-4": {
+			"Analyser\\": "src/Analyser"
 		}
 	},
 	"autoload-dev" : {

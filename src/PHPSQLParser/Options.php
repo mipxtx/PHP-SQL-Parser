@@ -30,6 +30,11 @@ final class Options
     const ANSI_QUOTES = 'ansi_quotes';
 
     /**
+     * @const string
+     */
+    const QUERY_DELIMITER = 'query_delimiter';
+
+    /**
      * Options constructor.
      *
      * @param array $options
@@ -53,5 +58,14 @@ final class Options
     public function getANSIQuotes()
     {
         return (isset($this->options[self::ANSI_QUOTES]) && $this->options[self::ANSI_QUOTES]);
+    }
+
+    public function getDelimiter()
+    {
+        if (isset($this->options[self::QUERY_DELIMITER])) {
+            return $this->options[self::QUERY_DELIMITER];
+        } else {
+            return ";";
+        }
     }
 }

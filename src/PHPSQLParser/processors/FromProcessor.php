@@ -187,6 +187,7 @@ class FromProcessor extends AbstractProcessor {
 
             case 'OUTER':
             case 'JOIN':
+            case 'APPLY':
                 if ($token_category === 'LEFT' || $token_category === 'RIGHT' || $token_category === 'NATURAL') {
                     $token_category = '';
                     $parseInfo['next_join_type'] = strtoupper(trim($prevToken)); // it seems to be a join
@@ -306,6 +307,7 @@ class FromProcessor extends AbstractProcessor {
                 $parseInfo['next_join_type'] = 'CROSS';
 
             case 'JOIN':
+            case 'APPLY':
                 if ($token_category === 'IDX_HINT') {
                     $cur_hint = (count($parseInfo['hints']) - 1);
                     $parseInfo['hints'][$cur_hint]['hint_type'] .= " " . $upper;

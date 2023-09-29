@@ -49,20 +49,41 @@ namespace PHPSQLParser\processors;
  * @license http://www.debian.org/misc/bsd.license  BSD License (3 Clause)
  *
  */
+
 class SQLProcessor extends SQLChunkProcessor {
 
+    private $debug = 0;
+    const INCREMENTED_STATE = [
+        "SET", "INSERT", "DELETE",
+        "DECLARE", "IF", "REPLACE", "EXEC", "BEGIN", "END", ";", "OPEN", "CLOSE", "DEALLOCATE"
+    ];
+
     /**
-     * This function breaks up the SQL statement into logical sections. 
+     * This function breaks up the SQL statement into logical sections.
      * Some sections are delegated to specialized processors.
      */
-    public function process($tokens) {
+
+    public function  getNextNonWhite($tokens,$tokenNumber){
+        for ($i=$tokenNumber+1;$i<count($tokens);$i++){
+            $trim = trim($tokens[$i]);
+            if($trim){
+                return $trim;
+            }
+        }
+        return "";
+    }
+
+    public function process($tokens, $blockMode = false,$unionMode = false) {
         $prev_category = "";
         $token_category = "";
+
         $skip_next = 0;
         $out = array();
 
-	// $tokens may come as a numeric indexed array starting with an index greater than 0 (or as a boolean)
-	$tokenCount = count($tokens);
+        $total = [];
+
+	    // $tokens may come as a numeric indexed array starting with an index greater than 0 (or as a boolean)
+	    $tokenCount = count($tokens);
         if ( is_array($tokens) ){
           $tokens = array_values($tokens);
         }
@@ -101,16 +122,70 @@ class SQLProcessor extends SQLChunkProcessor {
             }
 
             $upper = strtoupper($trim);
+
+            if($trim){
+                //echo "$trim / $prev_category\n";
+            }
+
+            //var_dump($upper == "UPDATE" && $this->getNextNonWhite($tokens, $tokenNumber) != "(");
+            //$next = $this->getNextNonWhite($tokens, $tokenNumber)[0];
+            if($out
+                /// trigger
+                && !in_array($prev_category, ["BEFORE","AFTER"])
+                && (
+                    in_array($upper,self::INCREMENTED_STATE)
+                    || ($upper == "WITH" && !in_array($prev_category, ["FROM","SELECT"]))
+                    || ($upper == "SELECT" && (!isset($out["INSERT"]) || count($out["INSERT"]) > 2))
+                    || ($upper == "UPDATE" && $this->getNextNonWhite($tokens, $tokenNumber)[0] != "(")
+                )
+
+            ){
+                if($blockMode) {
+                    $prev_category = "";
+                    $token_category = "";
+                    $total[] = $out;
+                    $out = [];
+                }
+
+                if ($unionMode) {
+                    return [$out, $tokenNumber];
+                }
+            }
+
+/*
+            if ($out && ) {
+                if ($blockMode) {
+                    $prev_category = "";
+                    $token_category = "";
+                    $total[] = $out;
+                    $out = [];
+                }
+                if ($unionMode) {
+                    return [$out, $tokenNumber];
+                }
+            }
+*/
+
+
             switch ($upper) {
 
             /* Tokens that get their own sections. These keywords have subclauses. */
+            case "BEGIN":
+            case "UNION":
             case 'SELECT':
+                if ($prev_category == "RETURNS") {
+                    $new_tokens = array_slice($tokens, $tokenNumber);
+                    $out[$prev_category]['contains'] = $this->process($new_tokens);
+                    break 2;
+                }
+                $token_category = $upper;
+                break;
             case 'ORDER':
             case 'VALUES':
             case 'GROUP':
             case 'HAVING':
             case 'WHERE':
-            case 'CALL':
+
             case 'PROCEDURE':
             case 'FUNCTION':
             case 'SERVER':
@@ -127,7 +202,20 @@ class SQLProcessor extends SQLChunkProcessor {
             case 'PURGE':
             case 'EXECUTE':
             case 'PREPARE':
+            case 'EXPLAIN':
+            case 'DESCRIBE':
+            case 'SHOW':
+            case 'RENAME':
+
+            case 'EXEC':
+            case 'DECLARE':
+            case 'MERGE':
+            case 'END':
                 $token_category = $upper;
+                break;
+            case 'CALL':
+                $token_category = $upper;
+
                 break;
 
             case 'DEALLOCATE':
@@ -170,22 +258,12 @@ class SQLProcessor extends SQLChunkProcessor {
                 $token_category = $upper;
                 break;
 
-            case 'EXPLAIN':
-            case 'DESCRIBE':
-            case 'SHOW':
-                $token_category = $upper;
-                break;
-
             case 'DESC':
                 if ($token_category === '') {
                     // short version of DESCRIBE
                     $token_category = $upper;
                 }
                 // else direction of ORDER-BY
-                break;
-
-            case 'RENAME':
-                $token_category = $upper;
                 break;
 
             case 'DATABASE':
@@ -239,9 +317,9 @@ class SQLProcessor extends SQLChunkProcessor {
             /*
              * These tokens get their own section, but have no subclauses. These tokens identify the statement but have no specific subclauses of their own.
              */
-            case 'DELETE':
+
             case 'ALTER':
-            case 'INSERT':
+
             case 'OPTIMIZE':
             case 'GRANT':
             case 'REVOKE':
@@ -258,11 +336,41 @@ class SQLProcessor extends SQLChunkProcessor {
             case 'REPAIR':
             case 'RESTORE':
             case 'HELP':
+            case "OPEN":
+            case "CLOSE":
+            case "DEALLOCATE":
+            case "FETCH":
+            case "AFTER":
                 $token_category = $upper;
                 // set the category in case these get subclauses in a future version of MySQL
                 $out[$upper][0] = $trim;
                 continue 2;
 
+            case 'UPDATE':
+                if(in_array($prev_category, ["AFTER","BEFORE"])){
+                    break;
+                }
+
+                if ($token_category === "") {
+                    $token_category = $upper;
+                    continue 2;
+                }
+                if ($token_category === 'DUPLICATE') {
+                    continue 2;
+                }
+                if($token_category === "IF"){
+                    continue 2;
+                }
+                break;
+            case 'INSERT':
+            case 'DELETE':
+                if(in_array($prev_category, ["AFTER","BEFORE"])){
+                    break;
+                }else{
+                    $token_category = $upper;
+                    // set the category in case these get subclauses in a future version of MySQL
+                    $out[$upper][0] = $trim;
+                }
             case 'TRUNCATE':
             	if ($prev_category === '') {
             		// set the category in case these get subclauses in a future version of MySQL
@@ -350,6 +458,9 @@ class SQLProcessor extends SQLChunkProcessor {
                     $prev_category = $token_category;
                     continue 2;
                 }
+                if($prev_category === "") {
+                    $token_category = $upper;
+                }
                 break;
 
             case 'NOT':
@@ -413,19 +524,17 @@ class SQLProcessor extends SQLChunkProcessor {
                 if ($prev_category === 'SHOW' || $token_category === 'FROM') {
                     break;
                 }
-                $skip_next = 1;
-                $out['OPTIONS'][] = 'FOR UPDATE'; // TODO: this could be generate problems within the position calculator
-                continue 2;
+                if($prev_category === "SELECT") {
+                    $skip_next = 1;
+                    $out['OPTIONS'][] = 'FOR UPDATE'; // TODO: this could be generate problems within the position calculator
+                    continue 2;
+                }
+                //$token_category = $upper;
+                // set the category in case these get subclauses in a future version of MySQL
 
-            case 'UPDATE':
-                if ($token_category === "") {
-                    $token_category = $upper;
-                    continue 2;
-                }
-                if ($token_category === 'DUPLICATE') {
-                    continue 2;
-                }
                 break;
+
+
 
             case 'START':
                 $trim = "BEGIN";
@@ -452,6 +561,7 @@ class SQLProcessor extends SQLChunkProcessor {
             case 'SHARE':
             case 'MODE':
             case ';':
+                if($out)
                 continue 2;
 
             case 'KEY':
@@ -497,23 +607,103 @@ class SQLProcessor extends SQLChunkProcessor {
                 if ($token_category === '') {
                 	$token_category = $upper;
                 }
+                if($prev_category === "SELECT") {
+                    continue 2;
+                }
                 break;
+            case "CASE":
+                    $new_tokens = array_slice($tokens, $tokenNumber + 1);
+                    if($this->debug){
+                        echo "jump in case\n";
+                    }
+                    $sub = $this->process($new_tokens, true);
+                    if($this->debug){
+                        echo "jump out case\n";
+                    }
+                    $len = null;
+                    foreach ($sub as $item){
+                        if(isset($item['END']['length'])){
+                            $len = $item['END']['length'];
+                            break;
+                        }
+                    }
+                    if($len === null){
+                        echo "END NOT FOUND";
+                        print_r($sub);
+                        die();
+                    }
+
+                    $slice_tokens = array_slice($tokens, $tokenNumber,$len+2);
+                    if($prev_category == "SELECT") {
+                        $out[$prev_category] = array_merge($out[$prev_category], $slice_tokens);
+                    }
+                    $tokenNumber += $len+1;
+                break;
+
 
             case 'AS':
-                break;
-
             case '':
             case ',':
-                break;
-
             default:
                 break;
+            }
+
+            if ($upper === "UNION") {
+                $new_tokens = array_slice($tokens, $tokenNumber + 1);
+                $p = $this->process($new_tokens, false, true);
+                if (!isset($p[0])) {
+                    echo "has no subitems: ";
+                    print_r($p);
+                    echo "\nat ";
+                    print_r(array_slice($new_tokens, 0, 30));
+                    die();
+                }
+                list($sub, $len) = $p;
+                $tokenNumber += $len;
+                $out = ['UNION' => ['sub_tree' => [parent::process($out), parent::process($sub)]]];
+                $prev_category = 'UNION';
+                continue;
             }
 
             // remove obsolete category after union (empty category because of
             // empty token before select)
             if ($token_category !== "" && ($prev_category === $token_category)) {
                 $out[$token_category][] = $token;
+            } elseif ($prev_category !== $token_category && $token_category !== "") {
+                $out[$token_category] = [];
+            }
+
+            if ($upper === "BEGIN") {
+                $new_tokens = array_slice($tokens, $tokenNumber + 1);
+                if($this->debug){
+                    echo "jump in begin\n";
+                }
+                $sub = $this->process($new_tokens, true);
+                if($this->debug){
+                    echo "jump out begin\n";
+                }
+                $out['BEGIN']['sub_tree'] = $sub;
+                $out['BEGIN']['start_at'] = $tokenNumber;
+
+
+                if(!$sub){
+                    throw new \Exception("no response");
+                }
+                if(!isset($sub[count($sub) - 1]['END'])){
+                    echo "no length in begin\n";
+                    print_r($sub);
+                    die();
+                }
+                $tokenNumber += $sub[count($sub) - 1]['END']['length'] + 2;
+            }
+
+
+            if ($upper === "END") {
+                //echo "end\n";
+                $out['END']['length'] = $tokenNumber;
+                $prev_category = "";
+                $total[] = $out;
+                break;
             }
 
             $prev_category = $token_category;
@@ -523,7 +713,14 @@ class SQLProcessor extends SQLChunkProcessor {
             return false;
         }
 
-        return parent::process($out);
+        if($blockMode){
+            $out = $total;
+        }
+
+        if ($unionMode) {
+            return [$out, $tokenNumber];
+        }
+
+        return parent::process($out, $blockMode);
     }
 }
-?>
