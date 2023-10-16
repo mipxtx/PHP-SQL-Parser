@@ -2,16 +2,19 @@
 
 namespace Analyser\Processor;
 
+use Analyser\Links\Context;
 use Analyser\Links\LinkPack;
 
-class WithProcessor extends AbstractProcessor
+class WithProcessor  extends AbstractProcessor
 {
 
-    public function process(array $tree, array $root, array $context): LinkPack
+    public function process(array $tree, Context $context): LinkPack
     {
-        $out = new LinkPack();
-        echo "with\n";
-        print_r($tree);
-        die();
+        $pack = new LinkPack();
+        foreach ($tree as $item){
+            //echo $item['name'] . "\n";
+            $context->getRoot()->addAlias($item['name'], "");
+        }
+        return $pack;
     }
 }

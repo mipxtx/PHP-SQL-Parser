@@ -60,7 +60,7 @@ class SQLChunkProcessor extends AbstractProcessor {
 
 
 
-    public function process($out, $blockmode=false) {
+    public function process($out, $blockmode=true) {
         if (!$out) {
             return false;
         }
@@ -235,6 +235,14 @@ class SQLChunkProcessor extends AbstractProcessor {
             $processor = new BeginProcessor($this->options);
             $out['BEGIN'] = $processor->process($out['BEGIN']);
         }
+        if(!empty($out['COMMIT'])){
+            $processor = new CommitProcessor($this->options);
+            $out['COMMIT'] = $processor->process($out['COMMIT']);
+        }
+        if(!empty($out['ROLLBACK'])){
+            $processor = new RollbackProcessor($this->options);
+            $out['ROLLBACK'] = $processor->process($out['ROLLBACK']);
+        }
         if(!empty($out['IF'])){
             $processor = new IfProcessor($this->options);
             $out['IF'] = $processor->process($out['IF']);
@@ -278,6 +286,38 @@ class SQLChunkProcessor extends AbstractProcessor {
         if(!empty($out['AFTER'])){
             $processor = new AfterProcessor($this->options);
             $out['AFTER'] = $processor->process($out['AFTER']);
+        }
+        if(!empty($out['END'])){
+            $processor = new EndProcessor($this->options);
+            $out['END'] = $processor->process($out['END']);
+        }
+        if(!empty($out['UNION'])){
+            $processor = new UnionProcessor($this->options);
+            $out['UNION'] = $processor->process($out['UNION']);
+        }
+        if(!empty($out['RETURN'])){
+            $processor = new ReturnProcessor($this->options);
+            $out['RETURN'] = $processor->process($out['RETURN']);
+        }
+        if(!empty($out['SYNONYM'])){
+            $processor = new SynonymProcessor($this->options);
+            $out['SYNONYM'] = $processor->process($out['SYNONYM']);
+        }
+        if(!empty($out['TYPE'])){
+            $processor = new TypeProcessor($this->options);
+            $out['TYPE'] = $processor->process($out['TYPE']);
+        }
+        if(!empty($out['RECEIVE'])){
+            $processor = new ReceiveProcessor($this->options);
+            $out['RECEIVE'] = $processor->process($out['RECEIVE']);
+        }
+        if(!empty($out['CONVERSATION'])){
+            $processor = new ConversationProcessor($this->options);
+            $out['CONVERSATION'] = $processor->process($out['CONVERSATION']);
+        }
+        if(!empty($out['CHECK'])){
+            $processor = new SimpleProcessor($this->options);
+            $out['CHECK'] = $processor->process($out['CHECK']);
         }
         return $out;
     }

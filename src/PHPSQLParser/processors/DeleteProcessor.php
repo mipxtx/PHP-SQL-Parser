@@ -55,10 +55,19 @@ class DeleteProcessor extends AbstractProcessor {
         $tables = array();
         $del = $tokens['DELETE'];
 
+        $i=0;
         foreach ($tokens['DELETE'] as $expression) {
-            if (strtoupper($expression) !== 'DELETE' && trim($expression, " \t\n\r\0\x0B.*") !== ""
-                && !$this->isCommaToken($expression)) {
-                $tables[] = trim($expression, " \t\n\r\0\x0B.*");
+
+            if (
+                strtoupper($expression) !== 'DELETE'
+                && ($expression[0] != "(")
+                && trim($expression, " \t\n\r\0\x0B.*") !== ""
+                && !$this->isCommaToken($expression)
+            ) {
+                $tables[$i] = trim($expression, " \t\n\r\0\x0B.*");
+            }
+            if($this->isCommaToken($expression)){
+                $i++;
             }
         }
 
@@ -76,8 +85,11 @@ class DeleteProcessor extends AbstractProcessor {
             unset($tokens['OPTIONS']);
         }
 
-        $tokens['DELETE'] = array('options' => (empty($options) ? false : $options),
-                                  'tables' => (empty($tables) ? false : $tables));
+        $tokens['DELETE'] = array(
+            'options' => (empty($options) ? false : $options),
+            'tables' => (empty($tables) ? false : $tables),
+            "base_expr" => implode($del)
+        );
         return $tokens;
     }
 }

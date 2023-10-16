@@ -5,22 +5,80 @@ namespace PHPSQLParser\processors;
 class ProcedureProcessor extends AbstractProcessor
 {
 
+    public function parseArgs($tokens)
+    {
+        $argv = [];
+        $argc = 0;
+
+        foreach ($tokens as $i => $token) {
+            if (!trim($token)) {
+                continue;
+            }
+
+            if ($token == ",") {
+                $argc++;
+            } else {
+                if (!isset($argv[$argc]) && $token[0] == "(") {
+                    $argv = $this->parseArgs(
+                        $this->splitSQLIntoTokens($this->removeParenthesisFromStart($token))
+                    );
+                    break;
+                }
+                if (strtoupper($token) == "AS") {
+                    if (!isset($argv[$argc])) {
+                        break;
+                    } else {
+                        continue;
+                    }
+                }
+
+                $argv[$argc][] = $token;
+            }
+        }
+        return $argv;
+    }
+
     public function process($tokens)
     {
-        $result = array();
-        $base_expr = "";
+        $name = "";
+        $args = false;
+        $argvals = [];
 
-        $first = array_shift($tokens);
-        foreach ($tokens as $token) {
-            $base_expr .= $token;
+        foreach ($tokens as $i => $token) {
+            if (!trim($token)) {
+                continue;
+            }
+
+            if (!$args) {
+                $args = true;
+                $name = $token;
+            } else {
+                $argvals = $this->parseArgs(array_slice($tokens, $i));
+                break;
+            }
         }
 
-        $result['base_expr'] = trim($first . $base_expr);
-        preg_match('/([^ ]*)(.*)/', trim(str_replace("\n"," ",$base_expr)), $out);
+
+        $result = array();
+        $result['base_expr'] = implode($tokens);
 
 
-        $result['name'] = $out[1];
-        $result['args'] = explode(",", trim($out[2]));
+        $result['name'] = $name;
+        $result['args'] = [];
+
+        foreach ($argvals as $arg) {
+
+
+            if (!isset($arg[1])) {
+                print_r($tokens);
+                print_r($arg);
+                throw new \Exception("error parsing procedure");
+
+            }
+
+            $result['args'][] = ['name' => $arg[0], 'type' => $arg[1]];
+        }
+
         return $result;
     }
 }

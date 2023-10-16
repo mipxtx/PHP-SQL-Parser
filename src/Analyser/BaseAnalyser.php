@@ -2,30 +2,38 @@
 
 namespace Analyser;
 
+use Analyser\Links\Context;
+use Analyser\Links\Contextable;
 use Analyser\Links\LinkPack;
+use Analyser\Links\Root;
 use Analyser\Processor\AbstractProcessor;
+use Analyser\Processor\DeclareProcessor;
+use Analyser\Processor\DeleteProcessor;
 use Analyser\Processor\ExecProcessor;
 use Analyser\Processor\FromProcessor;
 use Analyser\Processor\FunctionProcessor;
 use Analyser\Processor\IfProcessor;
 use Analyser\Processor\IntoProcessor;
 use Analyser\Processor\ProcedureProcessor;
+use Analyser\Processor\ReturnsProcessor;
+use Analyser\Processor\SynonymProcessor;
 use Analyser\Processor\TableProcessor;
 use Analyser\Processor\TriggerProcessor;
-use Analyser\Processor\UnionProcessor;
+use Analyser\Processor\TypeProcessor;
 use Analyser\Processor\UpdateProcessor;
-use Analyser\Processor\BeginProcessor;
 use Analyser\Processor\WithProcessor;
 
 class BaseAnalyser
 {
 
-    private $debug = false;
+    private $debug = 0;
     const ROOT_MAP = [
         'TABLE' => 'table',
         'PROCEDURE' => 'proc',
         'FUNCTION' => 'func',
-        'TRIGGER' => 'trig'
+        'TRIGGER' => 'trig',
+        'SYNONYM' => 'syn',
+        'TYPE' => 'type',
     ];
 
     const PROCESSOR_MAP = [
@@ -38,95 +46,102 @@ class BaseAnalyser
         'IF' => IfProcessor::class,
         'TABLE' => TableProcessor::class,
         'TRIGGER' => TriggerProcessor::class,
-        //'UNION' => UnionProcessor::class,
-        //'WITH' => WithProcessor::class,
+        'DECLARE' => DeclareProcessor::class,
+        'WITH' => WithProcessor::class,
+        "SYNONYM" => SynonymProcessor::class,
+        "TYPE" => TypeProcessor::class,
+        "DELETE" => DeleteProcessor::class,
+        "RETURNS" => ReturnsProcessor::class,
     ];
 
 
     public function analyseTop($in): LinkPack
     {
+
         $out = new LinkPack();
-        foreach ($in as $item) {
-            $root = [];
-            foreach (self::ROOT_MAP as $key => $type) {
-                if (isset($item[$key])) {
-                    $root = ['type' => $type, 'name' => $item[$key]['name']];
-                    break;
+        foreach ($in as $pack) {
+            $root = null;
+            foreach ($pack as $item) {
+                foreach (self::ROOT_MAP as $key => $type) {
+                    if (isset($item[$key]) && $root === null) {
+                        $root = new Root($type, $item[$key]['name']);
+                        break;
+                    }
                 }
-            }
-            if ($root) {
-                $out = $out->merge($this->analyse([$item], $root));
+                if ($root) {
+                    $out = $out->merge($this->analyse([$item], $root));
+                }
             }
         }
         return $out;
     }
 
-    public function analyse(array $tree, $root): LinkPack
+    public function analyse(array $tree, Contextable $context): LinkPack
     {
         $out = new LinkPack();
 
-        if($this->debug) {
+        if ($this->debug) {
             echo "in:\n";
             mprint_r($tree, 3, ['base_expr']);
         }
 
-        foreach ($tree as $i => $item) {
-            if($this->debug)
-                echo "iterate item $i\n";
-                if(isset($item['expr_type']) || isset($item['base_expr'])){
-                    if (isset($item['sub_tree']) && is_array($item['sub_tree'])) {
-                        if($this->debug)
-                            echo "jump in sub_tree\n";
-                        $out = $out->merge($this->analyse($item['sub_tree'], $root));
-                        if($this->debug)
-                            echo "jump out sub_tree\n";
-                    }
-                }else {
-                    foreach (self::PROCESSOR_MAP as $name => $class) {
-                        if (isset($item[$name])) {
-                            $context = array_keys($item);
-                            /** @var AbstractProcessor $processor */
-                            $processor = new $class($this);
-                            $out = $out->merge($processor->process($item[$name], $root, $context));
-                        }
-                    }
-                    if(!is_array($item)){
+        if (isset($tree['expr_type']) || isset($tree['base_expr']) || isset($tree['delim'])) {
+            if (isset($tree['sub_tree']) && is_array($tree['sub_tree'])) {
+                if ($this->debug)
+                    echo "jump in sub_tree\n";
+                $out = $out->merge($this->analyse($tree['sub_tree'], $context));
+                if ($this->debug)
+                    echo "jump out sub_tree\n";
+            }
+        } elseif (isset($tree[0])) {
+            foreach ($tree as $i => $item) {
+                if($this->debug) {
+                    echo "iterate $i\n";
+                }
+                if(!is_array($item)){
+                    mprint_r($tree,null,['base_expr']);
+                    throw new \Exception("not an array");
+                }
+                $out = $out->merge($this->analyse($item, $context));
+            }
+        } else {
+            if ($context instanceof Context) {
+                $root = $context->getRoot();
+            } elseif ($context instanceof Root) {
+                $root = $context;
+            } else {
+                throw new \Exception("unknown context");
+            }
+            $context_keys = array_keys($tree);
+            $l_context = new Context($root, $context_keys);
 
-                        var_dump($item);
-                        print_r($tree);
-
-                        throw new \Exception("unknown behavior");
-                    }
-                    foreach ($item as $key => $pack) {
-                        if($this->debug)
-                            echo "iterate $key\n";
-                        if (isset($pack[0])) {
-                            if($this->debug)
-                                echo "jump in $key\n";
-                            $out = $out->merge($this->analyse($pack, $root));
-                            if($this->debug)
-                                echo "jump out $key\n";
-                        } elseif (isset($pack['expr_type']) || isset($pack['sub_tree'])|| isset($item['base_expr'])) {
-                            if (isset($pack['sub_tree']) && is_array($pack['sub_tree'])) {
-                                if($this->debug)
-                                    echo "jump in sub_tree\n";
-                                $out = $out->merge($this->analyse($pack['sub_tree'], $root));
-                                if($this->debug)
-                                    echo "jump out sub_tree\n";
-                            }
-                        } else {
-                            if($this->debug) {
-                                echo "unknown pack in $key:";
-                                mprint_r($pack, 4, ['base_expr']);
-                            }
-                            //die();
-                        }
-                    }
+            foreach (self::PROCESSOR_MAP as $name => $class) {
+                if (isset($tree[$name])) {
+                    if ($this->debug)
+                        echo "process $name\n";
+                    /** @var AbstractProcessor $processor */
+                    $processor = new $class($this);
+                    $out = $out->merge($processor->process($tree[$name], $l_context));
                 }
             }
 
+            foreach ($tree as $key => $item) {
+                if($this->debug){
+                    echo "jump into $key\n";
+                }
 
+                if(!is_array($item)){
+                    echo "not an array\ntree:";
+                    print_r($tree);
+                    throw new \Exception("not an array");
+                }
 
+                $out = $out->merge($this->analyse($item, $l_context));
+                if($this->debug){
+                    echo "jump out $key\n";
+                }
+            }
+        }
         return $out;
     }
 }

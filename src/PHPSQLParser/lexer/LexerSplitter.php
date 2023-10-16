@@ -53,7 +53,7 @@ namespace PHPSQLParser\lexer;
  */
 class LexerSplitter {
 
-    protected static $splitters = array("<=>", "\r\n", "!=", ">=", "<=", "<>", "<<", ">>", ":=", "\\", "&&", "||", ":=",
+    public static $splitters = array("<=>", "\r\n", "!=", ">=", "<=", "<>", "<<", ">>", ":=", "\\", "&&", "||", ":=",
                                        "/*", "*/", "--", ">", "<", "|", "=", "^", "(", ")", "\t", "\n", "'", "\"", "`",
                                        ",", "@", " ", "+", "-", "*", "/", ";", "[", "]");
 
@@ -107,6 +107,12 @@ class LexerSplitter {
 				    break;
 			    case "/":
 				    $part = "\/";
+				    break;
+			    case "[":
+				    $part = "\[";
+				    break;
+			    case "]":
+				    $part = "\]";
 				    break;
 			    case "/\*":
 				    $part = "\/\*";

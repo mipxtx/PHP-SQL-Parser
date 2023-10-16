@@ -2,64 +2,71 @@
 
 namespace Analyser\Processor;
 
+use Analyser\Links\Context;
 use Analyser\Links\Link;
 use Analyser\Links\LinkPack;
+use Analyser\Links\Root;
 
 class FromProcessor extends AbstractProcessor
 {
 
-    public function process(array $tree, array $root, array $context): LinkPack
+    public function process(array $tree, Context $context): LinkPack
     {
-
         $pack = new LinkPack();
         $type = "from";
 
-        if (in_array('SET', $context)) {
-            $type = "select";
+        foreach (['SET', 'OPEN', 'FETCH', 'SELECT'] as $block) {
+            if ($context->hasBlock($block)) {
+                $type = 'select';
+                break;
+            }
         }
 
-        if (in_array('OPEN', $context)) {
-            $type = "select";
-        }
-        if (in_array('FETCH', $context)) {
-            $type = "select";
-        }
-
-        if (in_array('SELECT', $context)) {
-            $type = "select";
-        }
-        if (in_array('REPLACE', $context)) {
+        if ($context->hasBlock('REPLACE')) {
             $type = "replace";
         }
 
-        if (in_array('DELETE', $context)) {
+        if ($context->hasBlock('DELETE')) {
             $type = "delete";
         }
 
+        if($context->hasBlock('TYPE')){
+            $type = "type";
+        }
 
+        if($context->hasBlock('RECEIVE')){
+            $type = "receive";
+        }
+
+        if($context->hasBlock('CONVERSATION')){
+            $type = "conversation";
+        }
 
         if ($type === "from") {
-            echo "unknown from\n";
             print_r($context);
             print_r($tree);
-            die();
+            throw new \Exception("unknown from");
         }
 
         foreach ($tree as $item) {
-            if(!isset($item['table'])){
+
+            if (!isset($item['table'])) {
                 continue;
             }
-            if(in_array(strtolower($item['table']),['inserted', 'deleted']))
-            {
-                continue;
+
+            if (isset($item['alias']['name'])) {
+                $context->addAlias(
+                    $item['alias']['name'],
+                    $item['table']
+                );
             }
 
             $pack->add(
-                new Link($root, $type, $item['table'])
+                new Link($context, $type, $item['table'])
             );
 
-
         }
+
         return $pack;
     }
 

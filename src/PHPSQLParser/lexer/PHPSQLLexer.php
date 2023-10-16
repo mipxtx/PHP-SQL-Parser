@@ -80,22 +80,71 @@ class PHPSQLLexer {
         return (substr($haystack, -$length) === $needle);
     }
 
+    private function splitInto($sql): array
+    {
+        $sql = \SplFixedArray::fromArray(str_split($sql));
+
+        $out = [];
+        $current = '';
+
+        $keys = [];
+        foreach (LexerSplitter::$splitters as $key){
+            $keys[] = [\SplFixedArray::fromArray(str_split($key)),mb_strlen($key), $key];
+        }
+
+        $len = count($sql);
+        for ($i = 0; $i < $len; $i++) {
+            $found = false;
+            foreach ($keys as list($key,$keyLen,$keystr)) {
+                $found = false;
+                for ($j = 0; $j < $keyLen && $i + $j < $len; $j++) {
+                    if ($sql[$i + $j] != $key[$j]) {
+                        $found = false;
+                        break;
+                    }
+                    $found = true;
+                }
+                if ($found) {
+                    $i += $keyLen - 1;
+                    if ($current) {
+                        $out[] = $current;
+                    }
+                    $out[] = $keystr;
+                    $current = '';
+                    break;
+                }
+            }
+            if (!$found) {
+                $current .= $sql[$i];
+            }
+        }
+        if ($current) {
+            $out[] = $current;
+        }
+        return $out;
+    }
+
     public function split($sql) {
         if (!is_string($sql)) {
             throw new InvalidParameterException($sql);
         }
         $tokens = preg_split($this->splitters->getSplittersRegexPattern(), $sql, 0, PREG_SPLIT_DELIM_CAPTURE | PREG_SPLIT_NO_EMPTY);
+        //$tokens = $this->splitInto($sql);
         $tokens = $this->concatComments($tokens);
-        $tokens = $this->concatEscapeSequences($tokens);
+        //$tokens = $this->concatEscapeSequences($tokens);
         $tokens = $this->balanceBackticks($tokens);
         $tokens = $this->concatColReferences($tokens);
-
+        $tokens = $this->concatColReferences($tokens,"@");
+        $tokens = $this->concatColReferences($tokens,"=");
+        $tokens = $this->concatColReferences($tokens,"^");
+        $tokens = $this->concatColReferences($tokens,"#");
+        $tokens = $this->balanceSqBraces($tokens);
+        $tokens = $this->squashSqBraces($tokens);
         $tokens = $this->balanceParenthesis($tokens);
-        $tokens = $this->balanceParenthesis($tokens,"[","]");
-
         $tokens = $this->concatUserDefinedVariables($tokens);
         $tokens = $this->concatScientificNotations($tokens);
         $tokens = $this->concatNegativeNumbers($tokens);
+
         return $tokens;
     }
 
@@ -215,8 +264,9 @@ class PHPSQLLexer {
         $cnt = count($tokens);
         $comment = false;
         $backTicks = [];
-        $in_string = false;
         $inline = false;
+        $startTick = "";
+        $comentDepth = 0;
 
         while ($i < $cnt) {
 
@@ -231,43 +281,49 @@ class PHPSQLLexer {
              * Check to see if we're inside a value (i.e. back ticks).
              * If so inline comments are not valid.
              */
-            if ($comment === false && $this->isBacktick($token)) {
-                if (!empty($backTicks)) {
-                    $lastBacktick = array_pop($backTicks);
-                    if ($lastBacktick != $token) {
-                        $backTicks[] = $lastBacktick; // Re-add last back tick
-                        $backTicks[] = $token;
-                    }
-                } else {
-                    $backTicks[] = $token;
+            if ($comment === false) {
+                if($startTick == "" && $this->isBacktick($token)){
+                    $startTick = $token;
+                }elseif ($startTick == $token){
+                    $startTick = "";
                 }
             }
 
-            if($comment === false && ($token == "\"" || $token == "'")) {
-                $in_string = !$in_string;
-            }
-            if(!$in_string) {
+
+            if(!$startTick) {
                 if ($comment !== false) {
                     if ($inline === true && ($token === "\n" || $token === "\r\n")) {
+                        $inline = false;
                         $comment = false;
                     } else {
                         unset($tokens[$i]);
-                        $tokens[$comment] .= $token;
+                        //$tokens[$comment] .= $token;
                     }
-                    if ($inline === false && ($token === "*/")) {
-                        $comment = false;
+
+                    if($token === "*/" && !$inline){
+                        $comentDepth--;
+                        if ($inline === false && !$comentDepth) {
+                            $comment = false;
+                        }
                     }
+
                 }
 
                 if (($comment === false) && ($token === "--") && empty($backTicks)) {
                     $comment = $i;
                     $inline = true;
+                    unset($tokens[$i]);
                 }
 
-                if (($comment === false) && ($token === "/*")) {
+                if ($token === "/*" && !$inline) {
                     $comment = $i;
-                    $inline = false;
+                    $comentDepth++;
+                    unset($tokens[$i]);
                 }
+            }
+
+            if($comment){
+                unset($tokens[$i]);
             }
 
             $i++;
@@ -308,6 +364,9 @@ class PHPSQLLexer {
 
         $token_count = count($tokens);
         $i = $idx + 1;
+
+
+        $count = 0;
         while ($i < $token_count) {
 
             if (!isset($tokens[$i])) {
@@ -320,7 +379,16 @@ class PHPSQLLexer {
             unset($tokens[$i]);
 
             if ($token === $char) {
-                break;
+                $count ++;
+                if(
+                    ($count % 2 == 1)
+                    && !(
+                        isset($tokens[$i+1])
+                        && $tokens[$i+1] == $char
+                    )
+                ){
+                    break;
+                }
             }
 
             $i++;
@@ -336,7 +404,7 @@ class PHPSQLLexer {
      * 2. If the next token starts with a dot, we will add it to the previous token
      *
      */
-    protected function concatColReferences($tokens) {
+    protected function concatColReferences($tokens, $symbol = ".") {
 
         $cnt = count($tokens);
         $i = 0;
@@ -347,7 +415,7 @@ class PHPSQLLexer {
                 continue;
             }
 
-            if ($tokens[$i][0] === ".") {
+            if ($tokens[$i][0] === $symbol) {
 
                 // concat the previous tokens, till the token has been changed
                 $k = $i - 1;
@@ -363,7 +431,7 @@ class PHPSQLLexer {
                 }
             }
 
-            if ($this->endsWith($tokens[$i], '.') && !is_numeric($tokens[$i])) {
+            if ($this->endsWith($tokens[$i], $symbol) && !is_numeric($tokens[$i])) {
 
                 // concat the next tokens, till the token has been changed
                 $k = $i + 1;
@@ -402,33 +470,106 @@ class PHPSQLLexer {
         return array_values($tokens);
     }
 
-    protected function balanceParenthesis($tokens, $start = "(", $end = ")") {
-        $token_count = count($tokens);
-        $i = 0;
-        while ($i < $token_count) {
-            if ($tokens[$i][mb_strlen($tokens[$i])-1] !== $start) {
-                $i++;
-                continue;
-            }
-            $count = 1;
-            for ($n = $i + 1; $n < $token_count; $n++) {
-                $token = $tokens[$n];
-                if ($token[mb_strlen($token)-1] === $start) {
-                    $count++;
-                }
-                if ($token[0] === $end) {
-                    $count--;
-                }
-                $tokens[$i] .= $token;
-                unset($tokens[$n]);
-                if ($count === 0) {
-                    $n++;
-                    break;
-                }
-            }
-            $i = $n;
+    protected function squashSqBraces($tokens)
+    {
+        if(!$tokens){
+            return $tokens;
         }
+        $i = 0;
+        do {
+            $token = $tokens[$i];
+            if ($token == ".") {
+                if (
+                    $tokens[$i - 1][0] == "["
+                    || $tokens[$i + 1][0] == "["
+                ) {
+                    $tokens[$i - 1] .= $tokens[$i] . $tokens[$i + 1];
+                    unset($tokens[$i]);
+                    unset($tokens[$i + 1]);
+                    $tokens = array_values($tokens);
+                }else{
+                    $i++;
+                }
+            } else {
+                $i++;
+            }
+
+        } while (count($tokens) > $i);
         return array_values($tokens);
+
+    }
+
+    protected function balanceSqBraces(array $tokens) {
+
+        if(!$tokens){
+            return $tokens;
+        }
+        $start = null;
+        $output = [];
+        $current = 0;
+
+        do{
+            $token = array_shift($tokens);
+            // not first / split bug
+            if( $token[0] !== "'"
+                && mb_strlen($token) > 1
+                && ((strpos($token, "]")!== false || strpos($token, "[")!==false))
+            ){
+                $new_tokens = preg_split("/(\]|\[|\.)/",$token,0, PREG_SPLIT_DELIM_CAPTURE | PREG_SPLIT_NO_EMPTY);
+                $token = array_shift($new_tokens);
+                $cnt = count($new_tokens);
+                for ($i = 0; $i < $cnt; $i++) {
+                    array_unshift($tokens, $new_tokens[$cnt - $i - 1]);
+                }
+            }
+            if(!$start) {
+                switch ($token){
+                    case  "[" :
+                            $output[$current] = $token;
+                            $start = true;
+                        break;
+                    default:
+                        $output[$current] = $token;
+                        $current++;
+                }
+            }else{
+                $output[$current] .= $token;
+                if($token == "]"){
+                    $start = false;
+                    $current ++;
+                }
+            }
+        }while(count($tokens));
+        return array_values($output);
+    }
+
+    protected function balanceParenthesis($tokens) {
+        $out = [];
+        $current = "";
+        $count = 0;
+        while (count($tokens)) {
+
+            $token = array_shift($tokens);
+
+            if(($token[0] == "("||$token[0] == ")") && mb_strlen($token) > 1){
+                $other = mb_strcut($token,1);
+                array_unshift($tokens,$other);
+                $token = $token[0];
+            }
+
+            $current .= $token;
+            if($token === '('){
+                $count ++;
+            }
+            if($token === ')'){
+                $count --;
+            }
+            if($count == 0){
+                $out[] = $current;
+                $current = "";
+            }
+        }
+        return $out;
     }
 }
 

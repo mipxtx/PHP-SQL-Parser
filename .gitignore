@@ -3,5 +3,7 @@ composer.lock
 clover.xml
 composer.phar
 .idea
-run.php
+start.php
+graph.php
 test.sql
+graph.plantuml

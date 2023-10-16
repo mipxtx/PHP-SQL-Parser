@@ -4,6 +4,7 @@ namespace Analyser\Processor;
 
 use Analyser\BaseAnalyser;
 use Analyser\Links\AbstractItem;
+use Analyser\Links\Context;
 use Analyser\Links\LinkPack;
 
 abstract class AbstractProcessor
@@ -18,9 +19,9 @@ abstract class AbstractProcessor
         $this->base = $ba;
     }
 
-    public function analyse($tree, $root,$context): LinkPack
+    public function analyse($tree, $context): LinkPack
     {
-        return $this->base->analyse($tree, $root, $context);
+        return $this->base->analyse($tree, $context);
     }
 
     public function printDepts(array $array, $depth, $start)
@@ -50,9 +51,10 @@ abstract class AbstractProcessor
         return $out;
     }
 
-    public abstract function process(array $tree, array $root, array $context): LinkPack;
+    public abstract function process(array $tree, Context $context): LinkPack;
 
-    public function getSysName($sname){
+    public function getSysName($sname)
+    {
         return AbstractItem::sysName($sname);
     }
 }

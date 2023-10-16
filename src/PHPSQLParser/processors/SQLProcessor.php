@@ -54,8 +54,8 @@ class SQLProcessor extends SQLChunkProcessor {
 
     private $debug = 0;
     const INCREMENTED_STATE = [
-        "SET", "INSERT", "DELETE",
-        "DECLARE", "IF", "REPLACE", "EXEC", "BEGIN", "END", ";", "OPEN", "CLOSE", "DEALLOCATE"
+        "INSERT", "CREATE", "RECEIVE",
+        "DECLARE", "IF", "EXEC", "BEGIN", ";", "OPEN", "CLOSE", "DEALLOCATE"
     ];
 
     /**
@@ -73,7 +73,8 @@ class SQLProcessor extends SQLChunkProcessor {
         return "";
     }
 
-    public function process($tokens, $blockMode = false,$unionMode = false) {
+    public function process($tokens, $blockMode = false) {
+
         $prev_category = "";
         $token_category = "";
 
@@ -129,540 +130,500 @@ class SQLProcessor extends SQLChunkProcessor {
 
             //var_dump($upper == "UPDATE" && $this->getNextNonWhite($tokens, $tokenNumber) != "(");
             //$next = $this->getNextNonWhite($tokens, $tokenNumber)[0];
-            if($out
+            if(
+                $out
                 /// trigger
                 && !in_array($prev_category, ["BEFORE","AFTER"])
                 && (
-                    in_array($upper,self::INCREMENTED_STATE)
-                    || ($upper == "WITH" && !in_array($prev_category, ["FROM","SELECT"]))
+                    (in_array($upper, self::INCREMENTED_STATE) && $prev_category != "WITH")
+                    || ($upper == "WITH" && !in_array($prev_category, ["FROM", "SELECT", "PROCEDURE", "WITH"]))
                     || ($upper == "SELECT" && (!isset($out["INSERT"]) || count($out["INSERT"]) > 2))
+                    || ($upper == "SELECT" && !in_array($prev_category, ["SELECT"]))
                     || ($upper == "UPDATE" && $this->getNextNonWhite($tokens, $tokenNumber)[0] != "(")
+                    || ($upper == "UPDATE" && !in_array($prev_category, ["UPDATE"]))
+                    || ($upper == "END" && !in_array($prev_category, ["SELECT", "SET","END"]))
+                    || ($upper == "SET" && !in_array($prev_category, ["UPDATE","SET"]))
+                    || ($upper == "REPLACE" && !in_array($prev_category, ["SELECT","REPLACE","SET"]))
+                    || ($upper == "DELETE" && !in_array($prev_category, ["EXECUTE", "DELETE"]))
+                    || ($upper == "TRIGGER" && !in_array($prev_category, ["ENABLE"]))
                 )
-
-            ){
+            ) {
                 if($blockMode) {
                     $prev_category = "";
                     $token_category = "";
                     $total[] = $out;
                     $out = [];
                 }
-
-                if ($unionMode) {
-                    return [$out, $tokenNumber];
-                }
             }
+            if(isset($tokens[$tokenNumber +1]) && $tokens[$tokenNumber +1][0] == "("){
 
-/*
-            if ($out && ) {
-                if ($blockMode) {
-                    $prev_category = "";
-                    $token_category = "";
-                    $total[] = $out;
-                    $out = [];
-                }
-                if ($unionMode) {
-                    return [$out, $tokenNumber];
-                }
-            }
-*/
+            }else {
+                switch ($upper) {
+                    case 'PROC':
+                        $token_category = 'PROCEDURE';
+                        break;
+                    /* Tokens that get their own sections. These keywords have subclauses. */
+                    case "BEGIN":
+                    case "UNION":
+                    case 'SELECT':
+                    case 'RECEIVE':
+                    case 'ORDER':
+                    case 'VALUES':
+                    case 'GROUP':
+                    case 'HAVING':
+                    case 'WHERE':
+                    case 'PROCEDURE':
+                    case 'FUNCTION':
+                    case 'SYNONYM':
+                        //case 'TYPE':
+                    case 'SERVER':
+                    case 'LOGFILE':
+                    case 'DEFINER':
+                    case 'RETURNS':
+                    case 'TABLESPACE':
+                    //case 'DO':
+                    case 'FLUSH':
+                    case 'KILL':
+                    case 'RESET':
+                    case 'STOP':
+                    case 'PURGE':
+                    case 'EXECUTE':
+                    case 'PREPARE':
+                    case 'EXPLAIN':
+                    case 'DESCRIBE':
+                    case 'SHOW':
+                    case 'RENAME':
+                    case 'EXEC':
+                    case 'DECLARE':
+                    case 'MERGE':
+                    case 'CALL':
+                    case 'ENABLE':
+                        $token_category = $upper;
+                        break;
+                    case 'TRIGGER':
+                        if($prev_category != "ENABLE")
+                        $token_category = $upper;
+                        break;
+                    case "TYPE":
+                        if ($prev_category !== "SELECT") {
+                            $token_category = $upper;
+                        }
+                        break;
+                    case 'END':
+                        if (!in_array($prev_category, ["SELECT", "SET"])) {
+                            $token_category = $upper;
+                        }
+                        break;
+                    case 'DEALLOCATE':
+                        if ($trim === 'DEALLOCATE') {
+                            $skip_next = 1;
+                        }
+                        $token_category = $upper;
+                        break;
 
+                    case 'DUPLICATE':
+                        if ($token_category !== 'VALUES') {
+                            $token_category = $upper;
+                        }
+                        break;
 
-            switch ($upper) {
+                    case 'SET':
+                        if ($token_category !== 'TABLE') {
+                            $token_category = $upper;
+                        }
+                        break;
 
-            /* Tokens that get their own sections. These keywords have subclauses. */
-            case "BEGIN":
-            case "UNION":
-            case 'SELECT':
-                if ($prev_category == "RETURNS") {
-                    $new_tokens = array_slice($tokens, $tokenNumber);
-                    $out[$prev_category]['contains'] = $this->process($new_tokens);
-                    break 2;
-                }
-                $token_category = $upper;
-                break;
-            case 'ORDER':
-            case 'VALUES':
-            case 'GROUP':
-            case 'HAVING':
-            case 'WHERE':
-
-            case 'PROCEDURE':
-            case 'FUNCTION':
-            case 'SERVER':
-            case 'LOGFILE':
-            case 'DEFINER':
-            case 'RETURNS':
-            case 'TABLESPACE':
-            case 'TRIGGER':
-            case 'DO':
-            case 'FLUSH':
-            case 'KILL':
-            case 'RESET':
-            case 'STOP':
-            case 'PURGE':
-            case 'EXECUTE':
-            case 'PREPARE':
-            case 'EXPLAIN':
-            case 'DESCRIBE':
-            case 'SHOW':
-            case 'RENAME':
-
-            case 'EXEC':
-            case 'DECLARE':
-            case 'MERGE':
-            case 'END':
-                $token_category = $upper;
-                break;
-            case 'CALL':
-                $token_category = $upper;
-
-                break;
-
-            case 'DEALLOCATE':
-                if ($trim === 'DEALLOCATE') {
-                    $skip_next = 1;
-                }
-                $token_category = $upper;
-                break;
-
-            case 'DUPLICATE':
-                if ($token_category !== 'VALUES') {
-                    $token_category = $upper;
-                }
-                break;
-
-            case 'SET':
-                if ($token_category !== 'TABLE') {
-                    $token_category = $upper;
-                }
-                break;
-
-            case 'LIMIT':
-            case 'PLUGIN':
-            // no separate section
-                if ($token_category === 'SHOW') {
-                    break;
-                }
-                $token_category = $upper;
-                break;
-
-            case 'FROM':
-            // this FROM is different from FROM in other DML (not join related)
-                if ($token_category === 'PREPARE') {
-                    continue 2;
-                }
-                // no separate section
-                if ($token_category === 'SHOW') {
-                    break;
-                }
-                $token_category = $upper;
-                break;
-
-            case 'DESC':
-                if ($token_category === '') {
-                    // short version of DESCRIBE
-                    $token_category = $upper;
-                }
-                // else direction of ORDER-BY
-                break;
-
-            case 'DATABASE':
-            case 'SCHEMA':
-                if ($prev_category === 'DROP') {
-                    break;
-                }
-                if ($prev_category === 'SHOW') {
-                    break;
-                }
-                $token_category = $upper;
-                break;
-
-            case 'EVENT':
-            // issue 71
-                if ($prev_category === 'DROP' || $prev_category === 'ALTER' || $prev_category === 'CREATE') {
-                    $token_category = $upper;
-                }
-                break;
-
-            case 'DATA':
-            // prevent wrong handling of DATA as keyword
-                if ($prev_category === 'LOAD') {
-                    $token_category = $upper;
-                }
-                break;
-
-            case 'INTO':
-            // prevent wrong handling of CACHE within LOAD INDEX INTO CACHE...
-                if ($prev_category === 'LOAD') {
-                    $out[$prev_category][] = $trim;
-                    continue 2;
-                }
-                $token_category = $prev_category = $upper;
-                break;
-
-            case 'USER':
-            // prevent wrong processing as keyword
-                if ($prev_category === 'CREATE' || $prev_category === 'RENAME' || $prev_category === 'DROP') {
-                    $token_category = $upper;
-                }
-                break;
-
-            case 'VIEW':
-            // prevent wrong processing as keyword
-                if ($prev_category === 'CREATE' || $prev_category === 'ALTER' || $prev_category === 'DROP') {
-                    $token_category = $upper;
-                }
-                break;
-
-            /*
-             * These tokens get their own section, but have no subclauses. These tokens identify the statement but have no specific subclauses of their own.
-             */
-
-            case 'ALTER':
-
-            case 'OPTIMIZE':
-            case 'GRANT':
-            case 'REVOKE':
-            case 'HANDLER':
-            case 'LOAD':
-            case 'ROLLBACK':
-            case 'SAVEPOINT':
-            case 'UNLOCK':
-            case 'INSTALL':
-            case 'UNINSTALL':
-            case 'ANALZYE':
-            case 'BACKUP':
-            case 'CHECKSUM':
-            case 'REPAIR':
-            case 'RESTORE':
-            case 'HELP':
-            case "OPEN":
-            case "CLOSE":
-            case "DEALLOCATE":
-            case "FETCH":
-            case "AFTER":
-                $token_category = $upper;
-                // set the category in case these get subclauses in a future version of MySQL
-                $out[$upper][0] = $trim;
-                continue 2;
-
-            case 'UPDATE':
-                if(in_array($prev_category, ["AFTER","BEFORE"])){
-                    break;
-                }
-
-                if ($token_category === "") {
-                    $token_category = $upper;
-                    continue 2;
-                }
-                if ($token_category === 'DUPLICATE') {
-                    continue 2;
-                }
-                if($token_category === "IF"){
-                    continue 2;
-                }
-                break;
-            case 'INSERT':
-            case 'DELETE':
-                if(in_array($prev_category, ["AFTER","BEFORE"])){
-                    break;
-                }else{
-                    $token_category = $upper;
-                    // set the category in case these get subclauses in a future version of MySQL
-                    $out[$upper][0] = $trim;
-                }
-            case 'TRUNCATE':
-            	if ($prev_category === '') {
-            		// set the category in case these get subclauses in a future version of MySQL
-            		$token_category = $upper;
-            		$out[$upper][0] = $trim;
-            		continue 2;
-            	}
-                // part of the CREATE TABLE statement or a function
-                $out[$prev_category][] = $trim;
-                continue 2;
-
-            case 'REPLACE':
-            	if ($prev_category === '') {
-            		// set the category in case these get subclauses in a future version of MySQL
-            		$token_category = $upper;
-            		$out[$upper][0] = $trim;
-            		continue 2;
-            	}
-                // part of the CREATE TABLE statement or a function
-                $out[$prev_category][] = $trim;
-                continue 2;
-
-            case 'IGNORE':
-                if ($prev_category === 'TABLE') {
-                    // part of the CREATE TABLE statement
-                    $out[$prev_category][] = $trim;
-                    continue 2;
-                }
-                if ($token_category === 'FROM') {
-                    // part of the FROM statement (index hint)
-                    $out[$token_category][] = $trim;
-                    continue 2;
-                }
-                $out['OPTIONS'][] = $upper;
-                continue 2;
-
-            case 'CHECK':
-                if ($prev_category === 'TABLE') {
-                    $out[$prev_category][] = $trim;
-                    continue 2;
-                }
-                $token_category = $upper;
-                $out[$upper][0] = $trim;
-                continue 2;
-
-            case 'CREATE':
-                if ($prev_category === 'SHOW') {
-                    break;
-                }
-                $token_category = $upper;
-                break;
-
-            case 'INDEX':
-	            if ( in_array( $prev_category, array( 'CREATE', 'DROP' ) ) ) {
-		            $out[ $prev_category ][] = $trim;
-		            $token_category          = $upper;
-	            }
-	            break;
-
-            case 'TABLE':
-                if ($prev_category === 'CREATE') {
-                    $out[$prev_category][] = $trim;
-                    $token_category = $upper;
-                }
-                if ($prev_category === 'TRUNCATE') {
-                    $out[$prev_category][] = $trim;
-                    $token_category = $upper;
-                }
-                break;
-
-            case 'TEMPORARY':
-                if ($prev_category === 'CREATE') {
-                    $out[$prev_category][] = $trim;
-                    $token_category = $prev_category;
-                    continue 2;
-                }
-                break;
-
-            case 'IF':
-                if ($prev_category === 'TABLE') {
-                    $token_category = 'CREATE';
-                    $out[$token_category] = array_merge($out[$token_category], $out[$prev_category]);
-                    $out[$prev_category] = array();
-                    $out[$token_category][] = $trim;
-                    $prev_category = $token_category;
-                    continue 2;
-                }
-                if($prev_category === "") {
-                    $token_category = $upper;
-                }
-                break;
-
-            case 'NOT':
-                if ($prev_category === 'CREATE') {
-                    $token_category = $prev_category;
-                    $out[$prev_category][] = $trim;
-                    continue 2;
-                }
-                break;
-
-            case 'EXISTS':
-                if ($prev_category === 'CREATE') {
-                    $out[$prev_category][] = $trim;
-                    $prev_category = $token_category = 'TABLE';
-                    continue 2;
-                }
-                break;
-
-            case 'CACHE':
-                if ($prev_category === "" || $prev_category === 'RESET' || $prev_category === 'FLUSH'
-                    || $prev_category === 'LOAD') {
-                    $token_category = $upper;
-                    continue 2;
-                }
-                break;
-
-            /* This is either LOCK TABLES or SELECT ... LOCK IN SHARE MODE */
-            case 'LOCK':
-                if ($token_category === "") {
-                    $token_category = $upper;
-                    $out[$upper][0] = $trim;
-                } elseif ($token_category === 'INDEX') {
-                    break;
-                } else {
-                    $trim = 'LOCK IN SHARE MODE';
-                    $skip_next = 3;
-                    $out['OPTIONS'][] = $trim;
-                }
-                continue 2;
-
-            case 'USING': /* USING in FROM clause is different from USING w/ prepared statement*/
-                if ($token_category === 'EXECUTE') {
-                    $token_category = $upper;
-                    continue 2;
-                }
-                if ($token_category === 'FROM' && !empty($out['DELETE'])) {
-                    $token_category = $upper;
-                    continue 2;
-                }
-                break;
-
-            /* DROP TABLE is different from ALTER TABLE DROP ... */
-            case 'DROP':
-                if ($token_category !== 'ALTER') {
-                    $token_category = $upper;
-                    continue 2;
-                }
-                break;
-
-            case 'FOR':
-                if ($prev_category === 'SHOW' || $token_category === 'FROM') {
-                    break;
-                }
-                if($prev_category === "SELECT") {
-                    $skip_next = 1;
-                    $out['OPTIONS'][] = 'FOR UPDATE'; // TODO: this could be generate problems within the position calculator
-                    continue 2;
-                }
-                //$token_category = $upper;
-                // set the category in case these get subclauses in a future version of MySQL
-
-                break;
-
-
-
-            case 'START':
-                $trim = "BEGIN";
-                $out[$upper][0] = $upper; // TODO: this could be generate problems within the position calculator
-                $skip_next = 1;
-                break;
-
-            // This token is ignored, except within RENAME
-            case 'TO':
-                if ($token_category === 'RENAME') {
-                    break;
-                }
-                continue 2;
-
-            // This token is ignored, except within CREATE TABLE
-            case 'BY':
-                if ($prev_category === 'TABLE') {
-                    break;
-                }
-                continue 2;
-
-            // These tokens are ignored.
-            case 'ALL':
-            case 'SHARE':
-            case 'MODE':
-            case ';':
-                if($out)
-                continue 2;
-
-            case 'KEY':
-                if ($token_category === 'DUPLICATE') {
-                    continue 2;
-                }
-                break;
-
-            /* These tokens set particular options for the statement. */
-            case 'LOW_PRIORITY':
-            case 'DELAYED':
-            case 'QUICK':
-            case 'HIGH_PRIORITY':
-                $out['OPTIONS'][] = $trim;
-                continue 2;
-
-            case 'USE':
-                if ($token_category === 'FROM') {
-                    // index hint within FROM clause
-                    $out[$token_category][] = $trim;
-                    continue 2;
-                }
-                // set the category in case these get subclauses in a future version of MySQL
-                $token_category = $upper;
-                $out[$upper][0] = $trim;
-                continue 2;
-
-            case 'FORCE':
-                if ($token_category === 'FROM') {
-                    // index hint within FROM clause
-                    $out[$token_category][] = $trim;
-                    continue 2;
-                }
-                $out['OPTIONS'][] = $trim;
-                continue 2;
-
-            case 'WITH':
-                if ($token_category === 'GROUP') {
-                    $skip_next = 1;
-                    $out['OPTIONS'][] = 'WITH ROLLUP'; // TODO: this could be generate problems within the position calculator
-                    continue 2;
-                }
-                if ($token_category === '') {
-                	$token_category = $upper;
-                }
-                if($prev_category === "SELECT") {
-                    continue 2;
-                }
-                break;
-            case "CASE":
-                    $new_tokens = array_slice($tokens, $tokenNumber + 1);
-                    if($this->debug){
-                        echo "jump in case\n";
-                    }
-                    $sub = $this->process($new_tokens, true);
-                    if($this->debug){
-                        echo "jump out case\n";
-                    }
-                    $len = null;
-                    foreach ($sub as $item){
-                        if(isset($item['END']['length'])){
-                            $len = $item['END']['length'];
+                    case 'LIMIT':
+                    case 'PLUGIN':
+                        // no separate section
+                        if ($token_category === 'SHOW') {
                             break;
                         }
-                    }
-                    if($len === null){
-                        echo "END NOT FOUND";
-                        print_r($sub);
-                        die();
-                    }
+                        $token_category = $upper;
+                        break;
 
-                    $slice_tokens = array_slice($tokens, $tokenNumber,$len+2);
-                    if($prev_category == "SELECT") {
-                        $out[$prev_category] = array_merge($out[$prev_category], $slice_tokens);
-                    }
-                    $tokenNumber += $len+1;
-                break;
+                    case 'FROM':
+                        // this FROM is different from FROM in other DML (not join related)
+                        if ($token_category === 'PREPARE') {
+                            continue 2;
+                        }
+                        // no separate section
+                        if ($token_category === 'SHOW') {
+                            break;
+                        }
+                        $token_category = $upper;
+                        break;
+
+                    case 'DESC':
+                        if ($token_category === '') {
+                            // short version of DESCRIBE
+                            $token_category = $upper;
+                        }
+                        // else direction of ORDER-BY
+                        break;
+
+                    case 'DATABASE':
+                    case 'SCHEMA':
+                        if ($prev_category === 'DROP') {
+                            break;
+                        }
+                        if ($prev_category === 'SHOW') {
+                            break;
+                        }
+                        $token_category = $upper;
+                        break;
+
+                    case 'EVENT':
+                        // issue 71
+                        if ($prev_category === 'DROP' || $prev_category === 'ALTER' || $prev_category === 'CREATE') {
+                            $token_category = $upper;
+                        }
+                        break;
+
+                    case 'DATA':
+                        // prevent wrong handling of DATA as keyword
+                        if ($prev_category === 'LOAD') {
+                            $token_category = $upper;
+                        }
+                        break;
+
+                    case 'INTO':
+                        // prevent wrong handling of CACHE within LOAD INDEX INTO CACHE...
+                        if ($prev_category === 'LOAD') {
+                            $out[$prev_category][] = $trim;
+                            continue 2;
+                        }
+                        $token_category = $prev_category = $upper;
+                        break;
+
+                    case 'USER':
+                        // prevent wrong processing as keyword
+                        if ($prev_category === 'CREATE' || $prev_category === 'RENAME' || $prev_category === 'DROP') {
+                            $token_category = $upper;
+                        }
+                        break;
+
+                    case 'VIEW':
+                        // prevent wrong processing as keyword
+                        if ($prev_category === 'CREATE' || $prev_category === 'ALTER' || $prev_category === 'DROP') {
+                            $token_category = $upper;
+                        }
+                        break;
+
+                    /*
+                     * These tokens get their own section, but have no subclauses. These tokens identify the statement but have no specific subclauses of their own.
+                     */
+
+                    case 'ALTER':
+                        if($prev_category == "CREATE"){
+                            break;
+                        }
+                    case 'OPTIMIZE':
+                    case 'GRANT':
+                    case 'REVOKE':
+                    case 'HANDLER':
+                    case 'LOAD':
+                    case 'ROLLBACK':
+                    case 'SAVEPOINT':
+                    case 'UNLOCK':
+                    case 'INSTALL':
+                    case 'UNINSTALL':
+                    case 'ANALZYE':
+                    case 'BACKUP':
+                        //case 'CHECKSUM':
+                    case 'REPAIR':
+                    case 'RESTORE':
+                    case 'HELP':
+                    case "OPEN":
+                    case "CLOSE":
+                    case "DEALLOCATE":
+                    case "FETCH":
+                    case "AFTER":
+                    case "RETURN":
+                    case "CONVERSATION":
+                        $token_category = $upper;
+                        // set the category in case these get subclauses in a future version of MySQL
+                        $out[$upper][0] = $trim;
+                        continue 2;
+
+                    case 'UPDATE':
+                        if (in_array($prev_category, ["AFTER", "BEFORE"])) {
+                            break;
+                        }
+
+                        if ($token_category === "") {
+                            $token_category = $upper;
+                            continue 2;
+                        }
+                        if ($token_category === 'DUPLICATE') {
+                            continue 2;
+                        }
+                        if ($token_category === "IF") {
+                            continue 2;
+                        }
+                        break;
+                    case 'INSERT':
+                    case 'DELETE':
+                        if (in_array($prev_category, ["AFTER", "BEFORE","EXECUTE"])) {
+                            break;
+                        } else {
+                            $token_category = $upper;
+                            // set the category in case these get subclauses in a future version of MySQL
+                            $out[$upper][0] = $trim;
+                        }
+                    case 'TRUNCATE':
+                        if ($prev_category === '') {
+                            // set the category in case these get subclauses in a future version of MySQL
+                            $token_category = $upper;
+                            $out[$upper][0] = $trim;
+                            continue 2;
+                        }
+                        // part of the CREATE TABLE statement or a function
+                        $out[$prev_category][] = $trim;
+                        continue 2;
+
+                    case 'REPLACE':
+                        if ($prev_category === '') {
+                            // set the category in case these get subclauses in a future version of MySQL
+                            $token_category = $upper;
+                            $out[$upper][0] = $trim;
+                            continue 2;
+                        }
+                        // part of the CREATE TABLE statement or a function
+                        $out[$prev_category][] = $trim;
+                        continue 2;
+
+                    case 'IGNORE':
+                        if ($prev_category === 'TABLE') {
+                            // part of the CREATE TABLE statement
+                            $out[$prev_category][] = $trim;
+                            continue 2;
+                        }
+                        if ($token_category === 'FROM') {
+                            // part of the FROM statement (index hint)
+                            $out[$token_category][] = $trim;
+                            continue 2;
+                        }
+                        $out['OPTIONS'][] = $upper;
+                        continue 2;
+
+                    case 'CHECK':
+                        if ($prev_category === 'TABLE') {
+                            $out[$prev_category][] = $trim;
+                            continue 2;
+                        }
+                        $token_category = $upper;
+                        $out[$upper][0] = $trim;
+                        continue 2;
+
+                    case 'CREATE':
+                        if ($prev_category === 'SHOW') {
+                            break;
+                        }
+                        $token_category = $upper;
+                        break;
+
+                    case 'INDEX':
+                        if (in_array($prev_category, array('CREATE', 'DROP'))) {
+                            $out[$prev_category][] = $trim;
+                            $token_category = $upper;
+                        }
+                        break;
+
+                    case 'TABLE':
+                        if ($prev_category === 'CREATE') {
+                            $out[$prev_category][] = $trim;
+                            $token_category = $upper;
+                        }
+                        if ($prev_category === 'TRUNCATE') {
+                            $out[$prev_category][] = $trim;
+                            $token_category = $upper;
+                        }
+                        break;
+
+                    case 'TEMPORARY':
+                        if ($prev_category === 'CREATE') {
+                            $out[$prev_category][] = $trim;
+                            $token_category = $prev_category;
+                            continue 2;
+                        }
+                        break;
+
+                    case 'IF':
+                        if ($prev_category === 'TABLE') {
+                            $token_category = 'CREATE';
+                            $out[$token_category] = array_merge($out[$token_category], $out[$prev_category]);
+                            $out[$prev_category] = array();
+                            $out[$token_category][] = $trim;
+                            $prev_category = $token_category;
+                            continue 2;
+                        }
+                        if ($prev_category === "") {
+                            $token_category = $upper;
+                        }
+                        break;
+
+                    case 'NOT':
+                        if ($prev_category === 'CREATE') {
+                            $token_category = $prev_category;
+                            $out[$prev_category][] = $trim;
+                            continue 2;
+                        }
+                        break;
+
+                    case 'EXISTS':
+                        if ($prev_category === 'CREATE') {
+                            $out[$prev_category][] = $trim;
+                            $prev_category = $token_category = 'TABLE';
+                            continue 2;
+                        }
+                        break;
+
+                    case 'CACHE':
+                        if ($prev_category === "" || $prev_category === 'RESET' || $prev_category === 'FLUSH'
+                            || $prev_category === 'LOAD') {
+                            $token_category = $upper;
+                            continue 2;
+                        }
+                        break;
+
+                    /* This is either LOCK TABLES or SELECT ... LOCK IN SHARE MODE */
+                    case 'LOCK':
+                        if ($token_category === "") {
+                            $token_category = $upper;
+                            $out[$upper][0] = $trim;
+                        } elseif ($token_category === 'INDEX') {
+                            break;
+                        } else {
+                            $trim = 'LOCK IN SHARE MODE';
+                            $skip_next = 3;
+                            $out['OPTIONS'][] = $trim;
+                        }
+                        continue 2;
+
+                    case 'USING': /* USING in FROM clause is different from USING w/ prepared statement*/
+                        if ($token_category === 'EXECUTE') {
+                            $token_category = $upper;
+                            continue 2;
+                        }
+                        if ($token_category === 'FROM' && !empty($out['DELETE'])) {
+                            $token_category = $upper;
+                            continue 2;
+                        }
+                        break;
+
+                    /* DROP TABLE is different from ALTER TABLE DROP ... */
+                    case 'DROP':
+                        if ($token_category !== 'ALTER') {
+                            $token_category = $upper;
+                            continue 2;
+                        }
+                        break;
+
+                    case 'FOR':
+                        if ($prev_category === 'SHOW' || $token_category === 'FROM') {
+                            break;
+                        }
+                        if ($prev_category === "SELECT") {
+                            $skip_next = 1;
+                            $out['OPTIONS'][] = 'FOR UPDATE'; // TODO: this could be generate problems within the position calculator
+                            continue 2;
+                        }
+                        //$token_category = $upper;
+                        // set the category in case these get subclauses in a future version of MySQL
+
+                        break;
 
 
-            case 'AS':
-            case '':
-            case ',':
-            default:
-                break;
-            }
+                    case 'START':
+                        $trim = "BEGIN";
+                        $out[$upper][0] = $upper; // TODO: this could be generate problems within the position calculator
+                        $skip_next = 1;
+                        break;
 
-            if ($upper === "UNION") {
-                $new_tokens = array_slice($tokens, $tokenNumber + 1);
-                $p = $this->process($new_tokens, false, true);
-                if (!isset($p[0])) {
-                    echo "has no subitems: ";
-                    print_r($p);
-                    echo "\nat ";
-                    print_r(array_slice($new_tokens, 0, 30));
-                    die();
+                    // This token is ignored, except within RENAME
+                    case 'TO':
+                        if ($token_category === 'RENAME') {
+                            break;
+                        }
+                        continue 2;
+
+                    // This token is ignored, except within CREATE TABLE
+                    case 'BY':
+                        if ($prev_category === 'TABLE') {
+                            break;
+                        }
+                        continue 2;
+
+                    // These tokens are ignored.
+                    case 'ALL':
+                    case 'SHARE':
+                    case 'MODE':
+                    case ';':
+                        if ($out)
+                            continue 2;
+
+                    case 'KEY':
+                        if ($token_category === 'DUPLICATE') {
+                            continue 2;
+                        }
+                        break;
+
+                    /* These tokens set particular options for the statement. */
+                    case 'LOW_PRIORITY':
+                    case 'DELAYED':
+                    case 'QUICK':
+                    case 'HIGH_PRIORITY':
+                        $out['OPTIONS'][] = $trim;
+                        continue 2;
+
+                    case 'USE':
+                        if ($token_category === 'FROM') {
+                            // index hint within FROM clause
+                            $out[$token_category][] = $trim;
+                            continue 2;
+                        }
+                        // set the category in case these get subclauses in a future version of MySQL
+                        $token_category = $upper;
+                        $out[$upper][0] = $trim;
+                        continue 2;
+
+                    case 'FORCE':
+                        if ($token_category === 'FROM') {
+                            // index hint within FROM clause
+                            $out[$token_category][] = $trim;
+                            continue 2;
+                        }
+                        $out['OPTIONS'][] = $trim;
+                        continue 2;
+
+                    case 'WITH':
+                        if ($token_category === 'GROUP') {
+                            $skip_next = 1;
+                            $out['OPTIONS'][] = 'WITH ROLLUP'; // TODO: this could be generate problems within the position calculator
+                            continue 2;
+                        }
+                        if ($token_category === '') {
+                            $token_category = $upper;
+                        }
+                        if ($token_category === 'PROCEDURE') {
+                            $token_category = $upper;
+                        }
+
+                        break;
+                    case "CASE":
+                        $new_tokens = array_slice($tokens, $tokenNumber + 1);
+                        list($items, $count) = $this->parseCase($new_tokens);
+                        $out[$prev_category] = array_merge($out[$prev_category], $items);
+                        $tokenNumber += $count + 2;
+                        continue 2;
+
+                    case 'AS':
+                    case '':
+                    case ',':
+                    default:
+                        break;
                 }
-                list($sub, $len) = $p;
-                $tokenNumber += $len;
-                $out = ['UNION' => ['sub_tree' => [parent::process($out), parent::process($sub)]]];
-                $prev_category = 'UNION';
-                continue;
             }
 
             // remove obsolete category after union (empty category because of
@@ -673,54 +634,46 @@ class SQLProcessor extends SQLChunkProcessor {
                 $out[$token_category] = [];
             }
 
-            if ($upper === "BEGIN") {
-                $new_tokens = array_slice($tokens, $tokenNumber + 1);
-                if($this->debug){
-                    echo "jump in begin\n";
-                }
-                $sub = $this->process($new_tokens, true);
-                if($this->debug){
-                    echo "jump out begin\n";
-                }
-                $out['BEGIN']['sub_tree'] = $sub;
-                $out['BEGIN']['start_at'] = $tokenNumber;
-
-
-                if(!$sub){
-                    throw new \Exception("no response");
-                }
-                if(!isset($sub[count($sub) - 1]['END'])){
-                    echo "no length in begin\n";
-                    print_r($sub);
-                    die();
-                }
-                $tokenNumber += $sub[count($sub) - 1]['END']['length'] + 2;
-            }
-
-
-            if ($upper === "END") {
-                //echo "end\n";
-                $out['END']['length'] = $tokenNumber;
-                $prev_category = "";
-                $total[] = $out;
-                break;
-            }
-
             $prev_category = $token_category;
         }
 
-        if (count($out) === 0) {
-            return false;
-        }
-
         if($blockMode){
+            if($out){
+                $total[] = $out;
+            }
             $out = $total;
-        }
-
-        if ($unionMode) {
-            return [$out, $tokenNumber];
+        }else{
+            if (count($out) === 0) {
+                return false;
+            }
         }
 
         return parent::process($out, $blockMode);
     }
+
+    function parseCase($tokens){
+
+        $out = [];
+        $depth = 1;
+        foreach ($tokens as $i => $token){
+            $upper = strtoupper($token);
+            switch ($upper){
+                case "CASE" :
+                    $out[]= $token;
+                    $depth ++;
+                break;
+                case "END" :{
+                    $out[]= $token;
+                    $depth --;
+                    if(!$depth){
+                        break 2;
+                    }
+                }
+                default :
+                    $out[] = $token;
+            }
+        }
+        return [$out,$i];
+    }
+
 }

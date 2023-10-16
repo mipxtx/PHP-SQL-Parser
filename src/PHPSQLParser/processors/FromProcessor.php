@@ -121,17 +121,7 @@ class FromProcessor extends AbstractProcessor {
                 $res['expr_type'] = ExpressionType::SUBQUERY;
             } else {
                 $tmp = $this->splitSQLIntoTokens($parseInfo['expression']);
-                $unionProcessor = new UnionProcessor($this->options);
-                $unionQueries = $unionProcessor->process($tmp);
-
-                // If there was no UNION or UNION ALL in the query, then the query is
-                // stored at $queries[0].
-                if (!empty($unionQueries) && !UnionProcessor::isUnion($unionQueries)) {
-                    $sub_tree = $this->process($unionQueries[0]);
-                }
-                else {
-                    $sub_tree = $unionQueries;
-                }
+                $sub_tree = $this->process($tmp);
                 $parseInfo['sub_tree'] = $sub_tree;
                 $res['expr_type'] = ExpressionType::TABLE_EXPRESSION;
             }
@@ -160,7 +150,7 @@ class FromProcessor extends AbstractProcessor {
         $skip_next = false;
         $i = 0;
 
-        foreach ($tokens as $token) {
+        foreach ($tokens as $token_id =>  $token) {
             $upper = strtoupper(trim($token));
 
             if ($skip_next && $token !== "") {
@@ -182,10 +172,11 @@ class FromProcessor extends AbstractProcessor {
             case 'CROSS':
             case ',':
             case 'INNER':
+            case 'OUTER':
             case 'STRAIGHT_JOIN':
                 break;
 
-            case 'OUTER':
+
             case 'JOIN':
             case 'APPLY':
                 if ($token_category === 'LEFT' || $token_category === 'RIGHT' || $token_category === 'NATURAL') {
@@ -206,7 +197,8 @@ class FromProcessor extends AbstractProcessor {
                 $prevToken = $token;
                 $i++;
                 continue 2;
-
+            case 'FROM':
+                return $this->process(array_slice($tokens,$token_id+1));
             default:
                 if ($token_category === 'LEFT' || $token_category === 'RIGHT') {
                     if ($upper === '') {
@@ -322,13 +314,16 @@ class FromProcessor extends AbstractProcessor {
                 $expr[] = $this->processFromExpression($parseInfo);
                 $parseInfo = $this->initParseInfo($parseInfo);
                 break;
-
+                case "WITH" :
+                    $token_category === 'WITH';
+                break;
             case 'GROUP BY':
                 if ($token_category === 'IDX_HINT') {
                     $cur_hint = (count($parseInfo['hints']) - 1);
                     $parseInfo['hints'][$cur_hint]['hint_type'] .= " " . $upper;
                     continue 2;
                 }
+
 
             default:
                 // TODO: enhance it, so we can have base_expr to calculate the position of the keywords
@@ -345,7 +340,9 @@ class FromProcessor extends AbstractProcessor {
                         $parseInfo['table'] = $token;
                         $parseInfo['no_quotes'] = $this->revokeQuotation($token);
                     }
-                } else if ($parseInfo['token_count'] === 1) {
+                } else if ($parseInfo['token_count'] === 1 && isset($token[0]) && $token[0] != "(") {
+
+
                     $parseInfo['alias'] = array('as' => false, 'name' => trim($token),
                                                 'no_quotes' => $this->revokeQuotation($token),
                                                 'base_expr' => trim($token));

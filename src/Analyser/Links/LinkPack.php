@@ -25,13 +25,21 @@ class LinkPack
         return $res;
     }
 
-    public function render(){
+    public function render(): array
+    {
         $out = [];
-        foreach ($this->items as $item){
-            $out[] = $item->generate();
-        }
+        foreach ($this->items as $item) {
+            $str = $item->generate();
+            if ($str) {
 
-        $out = array_unique($out);
-        return implode("\n",$out);
+                $out[$item->getName()][] = $str;
+            }
+        }
+        $res = [];
+        foreach ($out as $name => $pack) {
+            $pack = array_unique($pack);
+            $res[$name] =implode("\n", $pack);
+        }
+        return $res;
     }
 }

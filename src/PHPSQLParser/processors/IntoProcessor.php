@@ -58,8 +58,7 @@ class IntoProcessor extends AbstractProcessor {
 
         $unparsed = array_values($unparsed);
 
-        $tokenList['INTO'] = ['base_src' => $base, 'table' => $unparsed[1],'tokens' => $unparsed];
-
+        $tokenList['INTO'] = ['base_expr' => $base, 'table' => $unparsed[1],'tokens' => $unparsed];
 
         return $tokenList;
     }

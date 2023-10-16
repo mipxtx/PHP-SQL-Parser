@@ -136,6 +136,12 @@ class OrderByProcessor extends AbstractProcessor {
         }
 
         $out[] = $this->processOrderExpression($parseInfo, $select);
+        foreach ($out as $i => &$o) {
+            if (!is_array($o)) {
+                unset($out[$i]);
+            }
+        }
+
         return $out;
     }
 }

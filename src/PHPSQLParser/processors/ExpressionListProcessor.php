@@ -54,6 +54,7 @@ use PHPSQLParser\utils\PHPSQLParserConstants;
 class ExpressionListProcessor extends AbstractProcessor {
 
     public function process($tokens) {
+
         $resultList = array();
         $skip_next = false;
         $prev = new ExpressionToken();

@@ -63,7 +63,7 @@ class DefaultProcessor extends AbstractProcessor {
 
     protected function processSQL($tokens) {
         $processor = new SQLProcessor($this->options);
-        return $processor->process($tokens);
+        return $processor->process($tokens,true);
     }
 
     public function splitQuery($tokens, $delimiter){
@@ -89,13 +89,7 @@ class DefaultProcessor extends AbstractProcessor {
         $chuncks = $this->splitQuery($inputArray,$delimiter);
         $out = [];
         foreach ($chuncks as $i => $pack) {
-            //$queries = $this->processUnion($pack);
-
-            // If there was no UNION or UNION ALL in the query, then the query is
-            // stored at $queries[0].
-            //if (!empty($queries) && !$this->isUnion($queries)) {
             $queries = $this->processSQL($pack);
-            //}
             if($queries) {
                 $out[$i] = $queries;
             }

@@ -21,9 +21,9 @@ class Generator
      */
     public function __construct($input, $output)
     {
-        $this->input = realpath($input);
+        $this->input = realpath($input) . "/";
         if (!file_exists($this->input)) {
-            throw new \Exception("{$this->input} not found");
+            throw new \Exception("{$input} not found");
         }
         $this->output = $output;
 
@@ -33,7 +33,6 @@ class Generator
 
     public function _run()
     {
-
         $file = "test.sql";
         $text = $this->loadFile($file);
 
@@ -44,29 +43,48 @@ class Generator
         //die();
         $list = (new BaseAnalyser())->analyseTop($out);
         print_r($list);
+        print_r($list->render());
         //$this->renderFile($out,"","");
-
     }
 
-    public function run()
+    public function run($folder)
     {
-        $folder = "/Stored Procedures";
+        echo "Folder: $folder\n";
+        $listFile = str_replace("/","_",$folder) . ".plantuml";
 
-        file_put_contents($this->output . "$folder.plantuml", "");
+        file_put_contents(
+            $this->output . $listFile,
+            "@startuml\n!include ../DatabasePhysical.iuml\n"
+        );
 
-        if (!file_exists($this->output . $folder)) {
-            mkdir($this->output . $folder);
+        if (!file_exists($this->output ."/files")) {
+            mkdir($this->output ."/files");
         }
 
         $files = scandir($this->input . $folder);
-        array_shift($files);
-        array_shift($files);
 
-        foreach ($files as $i => $file) {
-            echo "$i:$file\n";
-            $this->runFile($folder, $file);
+        try {
+            foreach ($files as $i => $file) {
+                if($file[0] == "."){
+                    continue;
+                }
+                echo "$i:$file\n";
+                $list = $this->runFile($folder, $file);
+                file_put_contents(
+                    $this->output . "/$listFile",
+                    implode("\n",$list) . "\n",
+                    FILE_APPEND
+                );
+            }
+        } catch (\Throwable $e) {
+            throw $e;
+        } finally {
+            file_put_contents(
+                $this->output . "/$listFile",
+                "@enduml",
+                FILE_APPEND
+            );
         }
-
     }
 
     public function runFile($folder, $file)
@@ -74,44 +92,33 @@ class Generator
         $text = $this->loadFile($this->input . "$folder/$file");
         $out = $this->parser->parse($text);
         $list = (new BaseAnalyser())->analyseTop($out);
-
-        $this->renderFile($list, $folder, $file);
+        return  $this->renderFile($list, $folder, $file);
     }
 
     public function renderFile(LinkPack $list, $folder, $file)
     {
-        $path = explode(".", $file);
-        array_pop($path);
-        array_push($path, "plantuml");
-        $filename = implode(".", $path);
-        $filename = AbstractItem::sysName($filename);
 
+        $out = [];
+        $render = $list->render();
+        foreach ($render as $name => $text){
+            $ftext = "";
+            $ftext .= "@startuml\n!include ../../DatabasePhysical.iuml\n";
+            $ftext .= $text;
+            $ftext .= "\n@enduml";
+            file_put_contents($this->output . "/files/$name.plantuml", $ftext);
+            $out[] = "!include ./files/{$name}.plantuml";
+        }
+        return $out;
 
-        //echo "writing file ".$this->output . $filename. "\n";
-        file_put_contents($this->output . $folder . "/" . $filename, $list->render());
-
-        file_put_contents($this->output . "$folder.plantuml", "!include .{$folder}/{$filename}\n", FILE_APPEND);
     }
 
 
     public function loadFile($file)
     {
         $text = file_get_contents($file);
-
-        //echo $text . "\n--------\n";
-        $lines = explode("\n", $text);
-        foreach ($lines as &$line) {
-            list($line) = explode("--", $line, 2);
+        if($text === false){
+            echo $file . " not exist\n";
         }
-        $text = implode("\n", $lines);
-
-        //preg_match_all("/(\/\*.*?\*\/)/s",$text,$out);
-
-        //print_r($out);
-
-        $text = preg_replace("/(\/\*.*?\*\/)/s", "", $text);
-        //echo $text . "\n";
-        //die();
         return $text;
     }
 

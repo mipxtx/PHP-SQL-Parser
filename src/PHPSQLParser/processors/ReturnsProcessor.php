@@ -6,15 +6,18 @@ class ReturnsProcessor extends AbstractProcessor
 {
     public function process($tokens)
     {
-
-        $result = array();
-        $result['sub_tree'] = $tokens['contains'];
-        unset($tokens['contains']);
-        $base_expr = "";
-        foreach ($tokens as $token) {
-            $base_expr .= $token;
+        $result = [];
+        $words = [];
+        foreach ($tokens as $t){
+            if(trim($t)){
+                $words[] = $t;
+            }
         }
-        $result['base_expr'] = trim($base_expr);
+        if(isset($words[1])){
+            $result['name'] = $words[0];
+            $result['type'] = $words[1];
+        }
+        $result['base_expr'] = trim(implode($tokens));
 
         return $result;
     }

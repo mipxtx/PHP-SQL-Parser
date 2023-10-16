@@ -90,13 +90,24 @@ class WithProcessor extends AbstractProcessor {
             default:
                 switch ($prev) {
                 	case 'AS':
-                		// it follows a parentheses pair
-                		$subtree = $this->processTopLevel($this->removeParenthesisFromStart($token));
-                		$resultList[] = array('expr_type' => ExpressionType::BRACKET_EXPRESSION, 'base_expr' => $trim, 'sub_tree' => $subtree);
+                        // it follows a parentheses pair
+                        $subtree = $this->processTopLevel($this->removeParenthesisFromStart($token));
+                        if(isset($subtree[0])){
+                            $subtree = $subtree[0];
+                        }
+                        $resultList[] = array(
+                            'expr_type' => ExpressionType::BRACKET_EXPRESSION,
+                            'base_expr' => $trim,
+                            'sub_tree' => $subtree
+                        );
 
-                		$out[] = array('expr_type' => ExpressionType::SUBQUERY_FACTORING, 'base_expr' => trim($base_expr), 'sub_tree' => $resultList);
-                		$resultList = array();
-                		$category = '';
+                        $out[] = array(
+                            'expr_type' => ExpressionType::SUBQUERY_FACTORING,
+                            'base_expr' => trim($base_expr),
+                            'sub_tree' => $resultList
+                        );
+                        $resultList = array();
+                        $category = '';
                 	break;
 
                 	case '':
@@ -112,7 +123,16 @@ class WithProcessor extends AbstractProcessor {
                 break;
             }
             $prev = $category;
+
+
         }
+
+        foreach ($out as $i => $item){
+            if(isset($item['sub_tree'][0]['name'])){
+                $out[$i]['name'] = $item['sub_tree'][0]['name'];
+            }
+        }
+
         return $out;
     }
 }

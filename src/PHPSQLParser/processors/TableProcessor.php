@@ -88,6 +88,7 @@ class TableProcessor extends AbstractProcessor {
         $base_expr = '';
         $skip = 0;
 
+
         $prevCategory = "";
         foreach ($tokens as $tokenKey => $token) {
             $trim = trim($token);
