@@ -20,6 +20,6 @@ class ProcedureProcessor extends AbstractProcessor
 
         //$alias = $this->getSysName($tree['name']);
         //echo "Proc($alias, {$tree['name']})\n";
-        return (new LinkPack())->add(new Item('procedure', $tree['name']));
+        return (new LinkPack())->add(new Item('procedure', $tree['name'],$context));
     }
 }

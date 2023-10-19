@@ -31,14 +31,13 @@ class LinkPack
         foreach ($this->items as $item) {
             $str = $item->generate();
             if ($str) {
-
                 $out[$item->getName()][] = $str;
             }
         }
         $res = [];
         foreach ($out as $name => $pack) {
             $pack = array_unique($pack);
-            $res[$name] =implode("\n", $pack);
+            $res[$name] = implode("\n", $pack);
         }
         return $res;
     }

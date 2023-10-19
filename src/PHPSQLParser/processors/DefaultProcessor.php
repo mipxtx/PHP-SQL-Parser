@@ -85,7 +85,6 @@ class DefaultProcessor extends AbstractProcessor {
         $delimiter = $this->options->getDelimiter();
 
         $inputArray = $this->splitSQLIntoTokens($sql);
-
         $chuncks = $this->splitQuery($inputArray,$delimiter);
         $out = [];
         foreach ($chuncks as $i => $pack) {

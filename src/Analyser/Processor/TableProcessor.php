@@ -18,7 +18,7 @@ class TableProcessor extends AbstractProcessor
                 $context->getRoot()->addAlias($tree['name'], "TABLE");
                 return new LinkPack();
             }else {
-                return (new LinkPack())->add(new Item('table', trim($tree['name'])));
+                return (new LinkPack())->add(new Item('table', trim($tree['name']), $context));
             }
         }else{
             throw new \Exception('strange table');

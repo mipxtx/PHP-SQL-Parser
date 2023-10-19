@@ -133,18 +133,23 @@ class PHPSQLLexer {
         $tokens = $this->concatComments($tokens);
         //$tokens = $this->concatEscapeSequences($tokens);
         $tokens = $this->balanceBackticks($tokens);
-        $tokens = $this->concatColReferences($tokens);
-        $tokens = $this->concatColReferences($tokens,"@");
-        $tokens = $this->concatColReferences($tokens,"=");
-        $tokens = $this->concatColReferences($tokens,"^");
-        $tokens = $this->concatColReferences($tokens,"#");
+
+
         $tokens = $this->balanceSqBraces($tokens);
         $tokens = $this->squashSqBraces($tokens);
+
         $tokens = $this->balanceParenthesis($tokens);
+
+        $tokens = $this->concatColReferences($tokens);
+        $tokens = $this->concatColReferences($tokens,"@");
+        //$tokens = $this->concatColReferences($tokens,"=");
+        $tokens = $this->concatColReferences($tokens,"^");
+        $tokens = $this->concatColReferences($tokens,"#");
+
+
         $tokens = $this->concatUserDefinedVariables($tokens);
         $tokens = $this->concatScientificNotations($tokens);
         $tokens = $this->concatNegativeNumbers($tokens);
-
         return $tokens;
     }
 
@@ -414,7 +419,7 @@ class PHPSQLLexer {
                 $i++;
                 continue;
             }
-
+            $token = $tokens[$i];
             if ($tokens[$i][0] === $symbol) {
 
                 // concat the previous tokens, till the token has been changed

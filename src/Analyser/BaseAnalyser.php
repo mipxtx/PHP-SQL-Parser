@@ -14,6 +14,7 @@ use Analyser\Processor\FromProcessor;
 use Analyser\Processor\FunctionProcessor;
 use Analyser\Processor\IfProcessor;
 use Analyser\Processor\IntoProcessor;
+use Analyser\Processor\MergeProcessor;
 use Analyser\Processor\ProcedureProcessor;
 use Analyser\Processor\ReturnsProcessor;
 use Analyser\Processor\SynonymProcessor;
@@ -21,6 +22,7 @@ use Analyser\Processor\TableProcessor;
 use Analyser\Processor\TriggerProcessor;
 use Analyser\Processor\TypeProcessor;
 use Analyser\Processor\UpdateProcessor;
+use Analyser\Processor\ViewProcessor;
 use Analyser\Processor\WithProcessor;
 
 class BaseAnalyser
@@ -34,6 +36,7 @@ class BaseAnalyser
         'TRIGGER' => 'trig',
         'SYNONYM' => 'syn',
         'TYPE' => 'type',
+        'VIEW' => 'view',
     ];
 
     const PROCESSOR_MAP = [
@@ -52,10 +55,12 @@ class BaseAnalyser
         "TYPE" => TypeProcessor::class,
         "DELETE" => DeleteProcessor::class,
         "RETURNS" => ReturnsProcessor::class,
+        "VIEW" => ViewProcessor::class,
+        "MERGE" => MergeProcessor::class,
     ];
 
 
-    public function analyseTop($in): LinkPack
+    public function analyseTop($in, $project): LinkPack
     {
 
         $out = new LinkPack();
@@ -64,7 +69,7 @@ class BaseAnalyser
             foreach ($pack as $item) {
                 foreach (self::ROOT_MAP as $key => $type) {
                     if (isset($item[$key]) && $root === null) {
-                        $root = new Root($type, $item[$key]['name']);
+                        $root = new Root($type, $item[$key]['name'], $project);
                         break;
                     }
                 }

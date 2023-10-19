@@ -7,52 +7,58 @@ class Item extends AbstractItem
 
     private $type, $name;
 
+    private $context;
 
     /**
      * @param $type
      * @param $name
      */
-    public function __construct($type, $name)
+    public function __construct($type, $name, Context $context)
     {
-        if($type=='exec'){
+        if ($type == 'exec') {
             throw new \Exception("WTF?");
         }
 
         $this->type = trim($type);
         $this->name = trim($name);
+        $this->context = $context;
     }
-
 
 
     public function generate(): string
     {
-        if($this->skipName($this->name)){
+        if ($this->skipName($this->name)) {
             return "";
         }
 
-        $sname = $this->getSysName($this->name);
+        list($name, $sname) = $this->getNames($this->name,$this->context);
+
         switch ($this->type) {
             case "table" :
-                return 'Table(' . $sname . ', ' . $this->name . ')';
+                return 'Table(' . $sname . ', ' . $name . ')';
             case "trigger" :
-                return 'Trigger(' . $sname . ', ' . $this->name . ')';
+                return 'Trigger(' . $sname . ', ' . $name . ')';
             case "procedure" :
-                return 'Proc(' . $sname . ', ' . $this->name . ')';
+                return 'Proc(' . $sname . ', ' . $name . ')';
             case "function" :
-                return 'Func(' . $sname . ', ' . $this->name . ')';
+                return 'Func(' . $sname . ', ' . $name . ')';
             case "declare":
-                return 'Declare(' . $sname . ', ' . $this->name . ')';
+                return 'Declare(' . $sname . ', ' . $name . ')';
             case "type":
-                return 'Type(' . $sname . ', ' . $this->name . ')';
+                return 'Type(' . $sname . ', ' . $name . ')';
             case "syn":
-                return 'Synonym(' . $sname . ', ' . $this->name . ')';
+                return 'Synonym(' . $sname . ', ' . $name . ')';
+            case "view":
+                return 'View(' . $sname . ', ' . $name . ')';
             default:
                 throw new \Exception("unknown render type: {$this->type}");
         }
     }
 
+
+
     public function getName(): string
     {
-        return $this->getSysName($this->name);
+        return $this->getNames($this->name,$this->context)[1];
     }
 }

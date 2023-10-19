@@ -17,12 +17,7 @@ class DeclareProcessor extends AbstractProcessor
         $out = new LinkPack();
         foreach ($tree['items'] as $item) {
             $name = $item['name'];
-
-
-
                 $context->getRoot()->addAlias($name, $item['type']);
-
-
         }
         return $out;
     }

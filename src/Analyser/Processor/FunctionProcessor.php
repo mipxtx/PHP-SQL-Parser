@@ -12,6 +12,6 @@ class FunctionProcessor extends AbstractProcessor
     public function process(array $tree, Context $context): LinkPack
     {
         //echo "function:  " . $tree['name'] . "\n";
-        return (new LinkPack())->add(new Item('function', $tree['name']));
+        return (new LinkPack())->add(new Item('function', $tree['name'],$context));
     }
 }

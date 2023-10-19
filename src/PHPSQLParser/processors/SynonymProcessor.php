@@ -7,6 +7,7 @@ class SynonymProcessor extends AbstractProcessor
 
     public function process($tokens)
     {
+
         $name = "";
         $target = "";
         $state = "";

@@ -15,6 +15,6 @@ class TypeProcessor extends AbstractProcessor
             return new LinkPack();
         }
 
-        return (new LinkPack())->add(new Item("type", $tree['name']));
+        return (new LinkPack())->add(new Item("type", $tree['name'], $context));
     }
 }

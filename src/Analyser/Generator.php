@@ -11,6 +11,8 @@ class Generator
 {
     private $input, $output;
 
+    private $project;
+
     /**
      * @var PHPSQLParser
      */
@@ -19,13 +21,19 @@ class Generator
     /**
      * @param PHPSQLParser $parser
      */
-    public function __construct($input, $output)
+    public function __construct($input, $output, $project)
     {
-        $this->input = realpath($input) . "/";
+        $this->input = realpath($input . "/$project") . "/";
         if (!file_exists($this->input)) {
             throw new \Exception("{$input} not found");
         }
+
+
         $this->output = $output;
+        if (!file_exists($this->output)) {
+            mkdir($this->output);
+        }
+        $this->project = $project;
 
         $this->parser = new PHPSQLParser(false, false, [Options::QUERY_DELIMITER => "GO"]);
     }
@@ -37,11 +45,11 @@ class Generator
         $text = $this->loadFile($file);
 
         $out = $this->parser->parse($text);
-        //mprint_r($out,null,['base_expr']);
+        mprint_r($out,null,['base_expr']);
         //die();
 
         //die();
-        $list = (new BaseAnalyser())->analyseTop($out);
+        $list = (new BaseAnalyser())->analyseTop($out, $this->project);
         print_r($list);
         print_r($list->render());
         //$this->renderFile($out,"","");
@@ -50,29 +58,29 @@ class Generator
     public function run($folder)
     {
         echo "Folder: $folder\n";
-        $listFile = str_replace("/","_",$folder) . ".plantuml";
+        $listFile = str_replace("/", "_", $folder) . ".plantuml";
+
+        if(!file_exists($this->output. "/{$this->project}/")){
+            mkdir($this->output. "/{$this->project}/");
+        }
 
         file_put_contents(
-            $this->output . $listFile,
+            $this->output. "/{$this->project}/" . $listFile,
             "@startuml\n!include ../DatabasePhysical.iuml\n"
         );
-
-        if (!file_exists($this->output ."/files")) {
-            mkdir($this->output ."/files");
-        }
 
         $files = scandir($this->input . $folder);
 
         try {
             foreach ($files as $i => $file) {
-                if($file[0] == "."){
+                if ($file[0] == ".") {
                     continue;
                 }
                 echo "$i:$file\n";
                 $list = $this->runFile($folder, $file);
                 file_put_contents(
-                    $this->output . "/$listFile",
-                    implode("\n",$list) . "\n",
+                    $this->output . "/{$this->project}/"."/$listFile",
+                    implode("\n", $list) . "\n",
                     FILE_APPEND
                 );
             }
@@ -80,7 +88,7 @@ class Generator
             throw $e;
         } finally {
             file_put_contents(
-                $this->output . "/$listFile",
+                $this->output . "/{$this->project}/$listFile",
                 "@enduml",
                 FILE_APPEND
             );
@@ -91,21 +99,31 @@ class Generator
     {
         $text = $this->loadFile($this->input . "$folder/$file");
         $out = $this->parser->parse($text);
-        $list = (new BaseAnalyser())->analyseTop($out);
-        return  $this->renderFile($list, $folder, $file);
+        $list = (new BaseAnalyser())->analyseTop($out, $this->project);
+        return $this->renderFile($list);
     }
 
-    public function renderFile(LinkPack $list, $folder, $file)
+    public function renderFile(LinkPack $list)
     {
-
         $out = [];
         $render = $list->render();
-        foreach ($render as $name => $text){
+
+        foreach ($render as $name => $text) {
             $ftext = "";
             $ftext .= "@startuml\n!include ../../DatabasePhysical.iuml\n";
             $ftext .= $text;
             $ftext .= "\n@enduml";
-            file_put_contents($this->output . "/files/$name.plantuml", $ftext);
+
+            $project = $this->project;
+            if (substr_count($name, ".") == 3) {
+                list($project) = explode(".", $name, 2);
+            }
+
+            if (!file_exists($this->output . "/{$project}/files/")) {
+                mkdir($this->output . "/{$project}/files/",0777,true);
+            }
+
+            file_put_contents($this->output . "/{$project}/files/$name.plantuml", $ftext);
             $out[] = "!include ./files/{$name}.plantuml";
         }
         return $out;
@@ -116,10 +134,11 @@ class Generator
     public function loadFile($file)
     {
         $text = file_get_contents($file);
-        if($text === false){
+        if ($text === false) {
             echo $file . " not exist\n";
         }
-        return $text;
+        $bom = pack('H*','EFBBBF');
+        return preg_replace("/^$bom/", '', $text);
     }
 
 }

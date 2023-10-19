@@ -8,7 +8,6 @@ class ExecProcessor extends AbstractProcessor
     public function process($tokens)
     {
         $w = [];
-
         foreach ($tokens as $t){
             if(trim($t)){
                 $w[] = $t;

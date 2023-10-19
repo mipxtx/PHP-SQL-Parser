@@ -287,6 +287,19 @@ class SQLChunkProcessor extends AbstractProcessor {
             $processor = new AfterProcessor($this->options);
             $out['AFTER'] = $processor->process($out['AFTER']);
         }
+        if(!empty($out['BEFORE'])){
+            $processor = new AfterProcessor($this->options);
+            $out['BEFORE'] = $processor->process($out['BEFORE']);
+        }
+        if(!empty($out['INSTEAD'])){
+            $processor = new AfterProcessor($this->options);
+            $out['INSTEAD'] = $processor->process($out['INSTEAD']);
+        }
+
+        if(!empty($out['FOR'])){
+            $processor = new AfterProcessor($this->options);
+            $out['FOR'] = $processor->process($out['FOR']);
+        }
         if(!empty($out['END'])){
             $processor = new EndProcessor($this->options);
             $out['END'] = $processor->process($out['END']);
@@ -306,6 +319,10 @@ class SQLChunkProcessor extends AbstractProcessor {
         if(!empty($out['TYPE'])){
             $processor = new TypeProcessor($this->options);
             $out['TYPE'] = $processor->process($out['TYPE']);
+        }
+        if(!empty($out['VIEW'])){
+            $processor = new ViewProcessor($this->options);
+            $out['VIEW'] = $processor->process($out['VIEW']);
         }
         if(!empty($out['RECEIVE'])){
             $processor = new ReceiveProcessor($this->options);

@@ -4,7 +4,7 @@ namespace Analyser\Links;
 
 class Root implements Contextable
 {
-    private $type, $name;
+    private $type, $name, $base;
 
 
     private $aliases = [];
@@ -13,10 +13,11 @@ class Root implements Contextable
      * @param string $type
      * @param string $name
      */
-    public function __construct(string $type, string $name)
+    public function __construct(string $type, string $name, $base)
     {
         $this->type = $type;
         $this->name = $name;
+        $this->base = $base;
     }
 
     /**
@@ -34,6 +35,15 @@ class Root implements Contextable
     {
         return $this->name;
     }
+
+    /**
+     * @return mixed
+     */
+    public function getBase()
+    {
+        return $this->base;
+    }
+
 
     public function addAlias(string $alias, string $name)
     {
