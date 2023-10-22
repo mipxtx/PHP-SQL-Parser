@@ -240,6 +240,9 @@ class SQLProcessor extends SQLChunkProcessor {
                         break;
 
                     case 'LIMIT':
+                        if($prev_category == "SELECT"){
+                            break;
+                        }
                     case 'PLUGIN':
                         // no separate section
                         if ($token_category === 'SHOW') {

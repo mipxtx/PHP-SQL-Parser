@@ -33,6 +33,7 @@ class Link extends AbstractItem
         list($_, $from) = $this->getNames($from, $this->context);
 
         $to = $this->context->resolve($this->to);
+
         $to = $this->context->resolve($to);
 
         if ($this->skipName($to)) {

@@ -149,6 +149,7 @@ class Finder
                         case "Proc":
                         case "Table":
                         case "Function":
+                        case "Func":
                         case "Trigger":
                         case "View":
                             break;

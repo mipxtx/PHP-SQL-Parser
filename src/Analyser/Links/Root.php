@@ -57,8 +57,9 @@ class Root implements Contextable
 
     public function resolve(string $alias): string
     {
-        if (isset($this->aliases[$alias])) {
-            return $this->aliases[$alias];
+        $l_alias = strtolower(str_replace(["[", "]"], "", $alias));
+        if (isset($this->aliases[$l_alias])) {
+            return $this->aliases[$l_alias];
         }
         return $alias;
     }
