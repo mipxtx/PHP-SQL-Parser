@@ -66,7 +66,9 @@ class GroupByProcessor extends OrderByProcessor {
 
         $parsed = $this->processOrderExpression($parseInfo, $select);
         unset($parsed['direction']);
-        $out[] = $parsed;
+        if($parsed) {
+            $out[] = $parsed;
+        }
 
         return $out;
     }

@@ -18,10 +18,12 @@ class Generator
      */
     private $parser;
 
+
+    private $exclude;
     /**
      * @param PHPSQLParser $parser
      */
-    public function __construct($input, $output, $project)
+    public function __construct($input, $output, $project, array $exclude = [])
     {
         $this->input = realpath($input . "/$project") . "/";
         if (!file_exists($this->input)) {
@@ -33,7 +35,8 @@ class Generator
         if (!file_exists($this->output)) {
             mkdir($this->output);
         }
-        $this->project = $project;
+        $this->project = str_replace("-", "_", $project);
+        $this->exclude = $exclude;
 
         $this->parser = new PHPSQLParser(false, false, [Options::QUERY_DELIMITER => "GO"]);
     }
@@ -43,9 +46,8 @@ class Generator
     {
         $file = "test.sql";
         $text = $this->loadFile($file);
-
         $out = $this->parser->parse($text);
-        mprint_r($out,null,['base_expr']);
+        //mprint_r($out,null,['base_expr']);
         //die();
 
         //die();
@@ -57,7 +59,10 @@ class Generator
 
     public function run($folder)
     {
-        echo "Folder: $folder\n";
+        //echo "Folder: $folder\n";
+        if(!file_exists($this->input . $folder)){
+            return;
+        }
         $listFile = str_replace("/", "_", $folder) . ".plantuml";
 
         if(!file_exists($this->output. "/{$this->project}/")){
@@ -74,6 +79,9 @@ class Generator
         try {
             foreach ($files as $i => $file) {
                 if ($file[0] == ".") {
+                    continue;
+                }
+                if (in_array($file, $this->exclude)) {
                     continue;
                 }
                 echo "$i:$file\n";

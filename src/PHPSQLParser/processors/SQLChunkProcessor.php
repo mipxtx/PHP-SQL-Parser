@@ -320,6 +320,10 @@ class SQLChunkProcessor extends AbstractProcessor {
             $processor = new TypeProcessor($this->options);
             $out['TYPE'] = $processor->process($out['TYPE']);
         }
+        if(!empty($out['TRUNCATE'])){
+            $processor = new TruncateProcessor($this->options);
+            $out['TRUNCATE'] = $processor->process($out['TRUNCATE']);
+        }
         if(!empty($out['VIEW'])){
             $processor = new ViewProcessor($this->options);
             $out['VIEW'] = $processor->process($out['VIEW']);
@@ -332,9 +336,21 @@ class SQLChunkProcessor extends AbstractProcessor {
             $processor = new ConversationProcessor($this->options);
             $out['CONVERSATION'] = $processor->process($out['CONVERSATION']);
         }
+        if(!empty($out['DIALOG'])){
+            $processor = new ConversationProcessor($this->options);
+            $out['DIALOG'] = $processor->process($out['DIALOG']);
+        }
+        if(!empty($out['ENABLE'])){
+            $processor = new ConversationProcessor($this->options);
+            $out['ENABLE'] = $processor->process($out['ENABLE']);
+        }
         if(!empty($out['CHECK'])){
             $processor = new SimpleProcessor($this->options);
             $out['CHECK'] = $processor->process($out['CHECK']);
+        }
+        if(!empty($out['WHILE'])){
+            $processor = new ExpressionListProcessor($this->options);
+            $out['WHILE'] = $processor->process($out['WHILE']);
         }
         return $out;
     }

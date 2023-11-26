@@ -11,6 +11,9 @@ class MergeProcessor extends AbstractProcessor
 
     public function process(array $tree, Context $context): LinkPack
     {
+        if(!isset($tree["name"])){
+            return new LinkPack();
+        }
 
         if($tree["alias"]){
             $context->addAlias($tree["alias"], $tree["name"]);

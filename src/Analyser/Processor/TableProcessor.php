@@ -20,7 +20,11 @@ class TableProcessor extends AbstractProcessor
             }else {
                 return (new LinkPack())->add(new Item('table', trim($tree['name']), $context));
             }
+        }elseif($context->hasBlock('TRUNCATE')) {
+            return new LinkPack();
         }else{
+            print_r($context);
+            mprint_r($tree);
             throw new \Exception('strange table');
         }
     }

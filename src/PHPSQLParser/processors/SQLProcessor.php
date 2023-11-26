@@ -76,6 +76,16 @@ class SQLProcessor extends SQLChunkProcessor {
         return "";
     }
 
+    public function getPrevNonWhite($tokens,$tokenNumber){
+        for ($i=$tokenNumber-1;$i>=0;$i--){
+            $trim = trim($tokens[$i]);
+            if($trim){
+                return $trim;
+            }
+        }
+        return "";
+    }
+
     public function process($tokens, $blockMode = false) {
 
         $prev_category = "";
@@ -98,7 +108,7 @@ class SQLProcessor extends SQLChunkProcessor {
             // as there is no pull request for 279 by the user. His solution works and tested.
             if (!isset($tokens[$tokenNumber])) continue;// as a fix by Sinri 20180528
             $token = $tokens[$tokenNumber];
-            $trim = trim($token); // this removes also \n and \t!
+            $trim = trim($token, " \t\n\r\0\x0B\xC2\xA0");; // this removes also \n and \t!
 
             // if it starts with an "(", it should follow a SELECT
             if ($trim !== "" && $trim[0] === "(" && $token_category === "") {
@@ -132,7 +142,6 @@ class SQLProcessor extends SQLChunkProcessor {
             }
 
 
-
             //var_dump($upper == "UPDATE" && $this->getNextNonWhite($tokens, $tokenNumber) != "(");
             //$next = $this->getNextNonWhite($tokens, $tokenNumber)[0];
             if(
@@ -141,15 +150,25 @@ class SQLProcessor extends SQLChunkProcessor {
                 //&& !in_array($prev_category, ["BEFORE","AFTER","FOR","INSTEAD"])
                 && (
                     (in_array($upper, self::INCREMENTED_STATE) && $prev_category != "WITH" && !in_array($prev_category,self::TRIGGER_ACTION))
-                    || ($upper == "WITH" && !in_array($prev_category, ["FROM", "SELECT", "PROCEDURE", "WITH", "TRIGGER"]))
+                    || ($upper == "WITH" && !in_array($prev_category, ["FROM", "SELECT", "PROCEDURE", "WITH", "TRIGGER","DELETE"]))
                     || ($upper == "SELECT" && (!isset($out["INSERT"]) || count($out["INSERT"]) > 2))
                     || ($upper == "SELECT" && !in_array($prev_category, ["INTO"]))
-                    || ($upper == "UPDATE" && $this->getNextNonWhite($tokens, $tokenNumber)[0] != "(" && !in_array($prev_category,self::TRIGGER_ACTION))
+                    || (
+                        $upper == "UPDATE"
+                        && $this->getNextNonWhite($tokens, $tokenNumber)[0] != "("
+                        && !in_array($prev_category,self::TRIGGER_ACTION)
+                    )
                     || ($upper == "END" && !in_array($prev_category, ["SELECT", "SET","END"]))
                     || ($upper == "SET" && !in_array($prev_category, ["UPDATE","SET"]))
-                    || ($upper == "REPLACE" && !in_array($prev_category, ["SELECT","SET"]))
+                    || ($upper == "REPLACE" && !in_array($prev_category, ["SELECT","SET","GROUP"]))
                     //|| ($upper == "TRIGGER" && !in_array($prev_category, ["ENABLE"]))
-                    || ($upper == "AS" && in_array($prev_category, self::TRIGGER_ACTION))
+                    || ($upper == "AS"
+                        && $this->getPrevNonWhite($tokens,$tokenNumber)[0] != "@"
+                        && (
+                            in_array($prev_category, self::TRIGGER_ACTION)
+                            || in_array($prev_category, ['PROCEDURE']))
+                        )
+
                     //|| (in_array($upper, ['INSERT', 'UPDATE', 'DELETE', 'REPLACE']) && isset($out['REPLACE']) && in_array('AS', $out['REPLACE']))
                     ///|| (in_array($prev_category,self::TRIGGER_ACTION) && in_array($upper,self::MODIFY))
                 )
@@ -161,7 +180,7 @@ class SQLProcessor extends SQLChunkProcessor {
                     $out = [];
                 }
             }
-            if(isset($tokens[$tokenNumber +1]) && $tokens[$tokenNumber +1][0] == "("){
+            if($upper!='RETURN' && isset($tokens[$tokenNumber +1]) && $tokens[$tokenNumber +1][0] == "("){
 
             }else {
                 switch ($upper) {
@@ -204,6 +223,8 @@ class SQLProcessor extends SQLChunkProcessor {
                     case 'MERGE':
                     case 'CALL':
                     case 'ENABLE':
+                    case 'WHILE':
+                    case "RETURN":
                         $token_category = $upper;
                         break;
                     case 'TRIGGER':
@@ -211,7 +232,7 @@ class SQLProcessor extends SQLChunkProcessor {
                         $token_category = $upper;
                         break;
                     case "TYPE":
-                        if (!in_array($prev_category, ["SELECT", "WHERE"])) {
+                        if (!in_array($prev_category, ["SELECT", "WHERE", "SET"])) {
                             $token_category = $upper;
                         }
                         break;
@@ -240,7 +261,7 @@ class SQLProcessor extends SQLChunkProcessor {
                         break;
 
                     case 'LIMIT':
-                        if($prev_category == "SELECT"){
+                        if (in_array($prev_category, ["SELECT", "SET"])) {
                             break;
                         }
                     case 'PLUGIN':
@@ -302,6 +323,9 @@ class SQLProcessor extends SQLChunkProcessor {
                             $out[$prev_category][] = $trim;
                             continue 2;
                         }
+                        if($prev_category == "MERGE"){
+                            //break;
+                        }
                         $token_category = $prev_category = $upper;
                         break;
 
@@ -347,7 +371,8 @@ class SQLProcessor extends SQLChunkProcessor {
                     case "CLOSE":
                     case "DEALLOCATE":
                     case "FETCH":
-                    case "RETURN":
+
+                    case "DIALOG":
                     case "CONVERSATION":
                         $token_category = $upper;
                         // set the category in case these get subclauses in a future version of MySQL
@@ -620,12 +645,17 @@ class SQLProcessor extends SQLChunkProcessor {
                             $out['OPTIONS'][] = 'WITH ROLLUP'; // TODO: this could be generate problems within the position calculator
                             continue 2;
                         }
+
                         if ($token_category === '') {
                             $token_category = $upper;
                         }
                         if ($token_category === 'PROCEDURE') {
                             $token_category = $upper;
                         }
+                        if($token_category === "DELETE"){
+                            $token_category = $upper;
+                        }
+
 
                         break;
                     case "CASE":

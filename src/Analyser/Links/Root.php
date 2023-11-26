@@ -49,7 +49,7 @@ class Root implements Contextable
     {
         if ($alias != $name) {
             $alias = AbstractItem::clear($alias);
-            $this->aliases[$alias] = $name;
+            $this->aliases[strtolower($alias)] = $name;
         }
 
         return $this;

@@ -41,6 +41,9 @@ class FromProcessor extends AbstractProcessor
         if($context->hasBlock('CONVERSATION')){
             $type = "conversation";
         }
+        if($context->hasBlock('DIALOG')){
+            $type = "dialog";
+        }
 
         if ($type === "from") {
             print_r($context);

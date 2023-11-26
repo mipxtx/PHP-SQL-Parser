@@ -53,6 +53,7 @@ class Link extends AbstractItem
             case 'syn' :
             case 'receive' :
             case 'conversation' :
+            case 'dialog' :
 //            case 'declare':
                 return "{$this->linkType}({$from}, {$to})";
             case "type" :

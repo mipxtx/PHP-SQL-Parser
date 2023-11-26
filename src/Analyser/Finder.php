@@ -6,19 +6,25 @@ use Analyser\Links\AbstractItem;
 
 class Finder
 {
-    const SKIP = [
-        "deleted",
-        'inserted',
+
+    const PART_SKIP = [
         "debug.execution_start",
         "debug.execution_finish",
         "debug.execution_point",
+
+
+    ];
+    const SKIP = [
         "logging",
+        "deleted",
+        'inserted',
         "cursor_local_for",
         'string_split',
         'openjson',
         "sysname",
         'tinyint',
         'int',
+        'bigint',
         'numeric',
         'nvarchar',
         'datetime',
@@ -57,7 +63,7 @@ class Finder
     public function runLink($name)
     {
 
-        if(substr_count($name, ".", ) == 2) {
+        if(substr_count($name, ".") == 2) {
             list($folder, $_) = explode(".", $name, 2);
             $file = "$folder/files/$name.plantuml";
             //echo "parsing {$this->folder}$file\n";
@@ -140,6 +146,13 @@ class Finder
             foreach ($links as $i => $link) {
                 $to = $link[1];
 
+
+                foreach (self::PART_SKIP as $item){
+                    if(strpos($to, $item) !== false){
+                        unset($this->links[$from][$i]);
+                        continue 2;
+                    }
+                }
                 if (in_array($to, self::SKIP)) {
                     unset($this->links[$from][$i]);
                     continue;
@@ -152,6 +165,7 @@ class Finder
                         case "Func":
                         case "Trigger":
                         case "View":
+                        case "Type":
                             break;
                         case "Synonym" :
                             if (isset($this->links[$to][0][1])) {

@@ -71,7 +71,7 @@ class ProcedureProcessor extends AbstractProcessor
 
             if (!isset($arg[1])) {
                 print_r($tokens);
-                print_r($arg);
+                print_r($argvals);
                 throw new \Exception("error parsing procedure");
 
             }

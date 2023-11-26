@@ -104,7 +104,11 @@ class BaseAnalyser
                     echo "iterate $i\n";
                 }
                 if(!is_array($item)){
-                    mprint_r($tree,null,['base_expr']);
+                    //mprint_r($tree,null,['base_expr']);
+                    print_r($context);
+                    echo "tree: ";
+                    var_dump($tree);
+
                     throw new \Exception("not an array");
                 }
                 $out = $out->merge($this->analyse($item, $context));

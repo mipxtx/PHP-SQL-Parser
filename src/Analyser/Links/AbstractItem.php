@@ -4,7 +4,7 @@ namespace Analyser\Links;
 
 abstract class AbstractItem
 {
-    const SEARCH = [")", "(", " ", "@", "=", "#", "-", ">", "<", ":", "?", "^", "/", "*", "+", ","];
+    const SEARCH = [")", "(", " ", "@", "=", "#", "-", ">", "<", ":", "?", "^", "/", "*", "+", ",","\\"];
 
     const BR = ["[", "]"];
 
@@ -32,7 +32,7 @@ abstract class AbstractItem
     public static function sysName($in_sname)
     {
         $sname = $in_sname;
-
+        $sname = self::transliterate($sname);
         $replace = [];
         foreach (self::SEARCH as $key) {
             $replace[] = "_";
@@ -69,5 +69,34 @@ abstract class AbstractItem
             $sysName = "".$context->getRoot()->getBase() . ".{$sysName}";
         }
         return [$name, $sysName];
+    }
+    static function transliterate($st) {
+        $rep = array(
+            'а' => 'a', 'б' => 'b', 'в' => 'v',
+            'г' => 'g', 'д' => 'd', 'е' => 'e',
+            'ё' => 'e', 'ж' => 'z', 'з' => 'z',
+            'и' => 'i', 'й' => 'y', 'к' => 'k',
+            'л' => 'l', 'м' => 'm', 'н' => 'n',
+            'о' => 'o', 'п' => 'p', 'р' => 'r',
+            'с' => 's', 'т' => 't', 'у' => 'u',
+            'ф' => 'f', 'х' => 'h', 'ц' => 'c',
+            'ч' => 'c', 'ш' => 's', 'щ' => 's',
+            'ь' => 'b', 'ы' => 'y', 'ъ' => 'b',
+            'э' => 'e', 'ю' => 'y', 'я' => 'y',
+            'А' => 'A', 'Б' => 'B', 'В' => 'V',
+            'Г' => 'G', 'Д' => 'D', 'Е' => 'E',
+            'Ё' => 'E', 'Ж' => 'Z', 'З' => 'Z',
+            'И' => 'I', 'Й' => 'Y', 'К' => 'K',
+            'Л' => 'L', 'М' => 'M', 'Н' => 'N',
+            'О' => 'O', 'П' => 'P', 'Р' => 'R',
+            'С' => 'S', 'Т' => 'T', 'У' => 'U',
+            'Ф' => 'F', 'Х' => 'H', 'Ц' => 'C',
+            'Ч' => 'C', 'Ш' => 'S', 'Щ' => 'S',
+            'Ь' => 'B', 'Ы' => 'Y', 'Ъ' => 'B',
+            'Э' => 'E', 'Ю' => 'Y', 'Я' => 'Y',
+        );
+
+        $out = str_replace(array_keys($rep), array_values($rep), $st);
+        return $out;
     }
 }

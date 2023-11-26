@@ -13,10 +13,15 @@ class MergeProcessor extends AbstractProcessor
                 $w[] = $t;
             }
         }
+        if(!isset($w[1])){
+            return [];
+        }
         $alias = $w[1];
         if(strtoupper($w[1]) == "AS"){
             $alias = $w[2];
         }
-        return ["name" => $w[0], "alias" => $alias, "base_expr" => implode($tokens)];
+        $ret =  ["name" => $w[0], "alias" => $alias, "base_expr" => implode($tokens)];
+
+        return $ret;
     }
 }
